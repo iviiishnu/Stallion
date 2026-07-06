@@ -1,0 +1,12 @@
+component_group,base_qty,unit,scaling_rule,notes
+Wood Frame,1,base unit,SL*SW*SH,Main structural frame
+Plywood,1,base unit,SL*SH,Side/back support panels
+Seat Foam,1,base unit,SL*SW,Seat cushion foam
+Back Foam,1,base unit,SL*SH,Backrest foam
+Handle Foam,1,base unit,SW*SH,Armrest foam
+Fabric,1,base unit,surface_area_ratio,Upholstery cover
+Springs,11,count,round(base*SL),Zig-zag springs
+Clips,45,count,round((45/11)*springs_new),Metal spring clips
+Seat Belts,3,count,round(base*SL),Elastic seat support
+Back Rest Belts,15,count,round(base*SL),Back support belts
+Handle Frame,1,base unit,SW*SH,Arm internal frame

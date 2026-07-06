@@ -1,0 +1,12 @@
+component_group,base_qty,unit,scaling_rule,new_qty
+Wood Frame,1.0,base unit,SL*SW*SH,1.2773109243697478
+Plywood,1.0,base unit,SL*SH,1.2100840336134453
+Seat Foam,1.0,base unit,SL*SW,1.2063492063492063
+Back Foam,1.0,base unit,SL*SH,1.2100840336134453
+Handle Foam,1.0,base unit,SW*SH,1.1176470588235294
+Fabric,1.0,base unit,surface_area_ratio,1.1925675675675675
+Springs,11.0,count,round(base*SL),13.0
+Clips,45.0,count,round((45/11)*springs_new),54.0
+Seat Belts,3.0,count,round(base*SL),4.0
+Back Rest Belts,15.0,count,round(base*SL),18.0
+Handle Frame,1.0,base unit,SW*SH,1.1176470588235294

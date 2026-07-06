@@ -1,0 +1,40 @@
+{
+    "request": {
+        "request_id": "demo_001",
+        "customer_name": "test_customer",
+        "sofa_type": "3_seater",
+        "image_path": "data/sample_inputs/sample_3seater_01.jpg",
+        "dimensions_mm": {
+            "length": 2400,
+            "width": 950,
+            "height": 900
+        }
+    },
+    "quote_result": {
+        "input_dimensions": {
+            "length_mm": 2400,
+            "width_mm": 950,
+            "height_mm": 900
+        },
+        "scale_factors": {
+            "SL": 1.1428571428571428,
+            "SW": 1.0555555555555556,
+            "SH": 1.0588235294117647
+        },
+        "summary": {
+            "material_cost": 21768.32838721074,
+            "labor_cost": 4000.0,
+            "finishing_cost": 2500.0,
+            "subtotal": 28268.32838721074,
+            "overhead": 2826.832838721074,
+            "cost_after_overhead": 31095.161225931814,
+            "profit": 6219.032245186363,
+            "final_quotation_price": 37314.193471118175
+        },
+        "output_files": {
+            "bom_csv": "C:\\Users\\Vishn\\Desktop\\sofa_project\\outputs\\bom_outputs\\demo_001_bom.csv",
+            "cost_csv": "C:\\Users\\Vishn\\Desktop\\sofa_project\\outputs\\quotations\\demo_001_cost.csv",
+            "summary_json": "C:\\Users\\Vishn\\Desktop\\sofa_project\\outputs\\quotations\\demo_001_summary.json"
+        }
+    }
+}

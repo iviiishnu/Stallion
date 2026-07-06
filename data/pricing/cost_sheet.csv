@@ -1,0 +1,16 @@
+material_component,unit_cost,unit
+Wood Frame,5000,base unit
+Plywood,1200,base unit
+Seat Foam,2500,base unit
+Back Foam,1800,base unit
+Handle Foam,800,base unit
+Fabric,2200,base unit
+Springs,120,each
+Clips,8,each
+Seat Belts,150,each
+Back Rest Belts,90,each
+Handle Frame,900,base unit
+Labor,4000,per sofa
+PVD / Finishing,2500,per sofa
+Overhead %,10,%
+Profit Margin %,20,%
