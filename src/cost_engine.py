@@ -9,7 +9,7 @@ class SofaCostEngine:
         """
         base_dir should point to sofa_project when running from src/
 
-        Example structure:
+        Expected structure:
             sofa_project/
             ├── data/
             │   ├── master_template/
@@ -23,7 +23,6 @@ class SofaCostEngine:
             └── src/
                 └── cost_engine.py
         """
-        # project root
         self.base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), base_dir))
 
         # -----------------------------
@@ -71,7 +70,6 @@ class SofaCostEngine:
         self.master_bom = pd.read_csv(self.master_bom_path)
         self.cost_sheet = pd.read_csv(self.cost_sheet_path)
 
-        # Fusion mapping is optional for safety, but expected in your project now
         if os.path.exists(self.fusion_map_path):
             self.fusion_map = pd.read_csv(self.fusion_map_path)
         else:
@@ -91,22 +89,28 @@ class SofaCostEngine:
     # ---------------------------------------------------
     def get_base_dimensions(self):
         """
-        Expected master_dimensions.csv format:
-        parameter,symbol,value_mm
-        sofa_length,L0,2100
-        sofa_width,W0,900
-        sofa_height,H0,850
-        ...
+        master_dimensions.csv expected columns:
+            parameter,symbol,value_mm
+
+        Example:
+            parameter,symbol,value_mm
+            Base Sofa Length,L0,2100
+            Base Sofa Width,W0,900
+            Base Sofa Height,H0,850
         """
         dim_map = {}
+
         for _, row in self.master_dimensions.iterrows():
-            dim_map[str(row["symbol"]).strip()] = float(row["value_mm"])
+            symbol = str(row["symbol"]).strip()
+            value = float(row["value_mm"])
+            dim_map[symbol] = value
 
-        L0 = dim_map["L0"]
-        W0 = dim_map["W0"]
-        H0 = dim_map["H0"]
+        required = ["L0", "W0", "H0"]
+        for key in required:
+            if key not in dim_map:
+                raise ValueError(f"Missing '{key}' in master_dimensions.csv")
 
-        return L0, W0, H0
+        return dim_map["L0"], dim_map["W0"], dim_map["H0"]
 
     # ---------------------------------------------------
     # 3. COMPUTE SCALE FACTORS
@@ -131,10 +135,14 @@ class SofaCostEngine:
         }
 
     # ---------------------------------------------------
-    # 4. SURFACE AREA RATIO FOR FABRIC
+    # 4. SURFACE AREA RATIO
     # ---------------------------------------------------
     @staticmethod
     def surface_area_ratio(L1, W1, H1, L0, W0, H0):
+        """
+        Approximate surface-area based scaling ratio.
+        Used for fabric / upholstery type components.
+        """
         num = (L1 * W1) + (L1 * H1) + (W1 * H1)
         den = (L0 * W0) + (L0 * H0) + (W0 * H0)
         return num / den
@@ -143,6 +151,17 @@ class SofaCostEngine:
     # 5. SCALE ONE COMPONENT
     # ---------------------------------------------------
     def scale_component(self, component_name, base_qty, scaling_rule, scales, springs_new=None):
+        """
+        Supported scaling rules:
+            3D Volume
+            Area
+            Area/Volume
+            Surface Area
+            Count by Length
+            Count by Height
+            Derived from Springs
+            Fixed
+        """
         SL = scales["SL"]
         SW = scales["SW"]
         SH = scales["SH"]
@@ -152,29 +171,45 @@ class SofaCostEngine:
 
         rule = str(scaling_rule).strip().lower()
 
-        if rule == "sl*sw*sh":
+        # Structural components that scale in all 3 dimensions
+        if rule == "3d volume":
             return base_qty * SL * SW * SH
 
-        elif rule == "sl*sh":
+        # Flat panels / plywood / back panels etc.
+        elif rule == "area":
+            # using length-height scaling as a simple structural panel approximation
             return base_qty * SL * SH
 
-        elif rule == "sl*sw":
+        # Foam / handle frame / similar components
+        elif rule == "area/volume":
+            # general approximation for seat/back/arm components
             return base_qty * SL * SW
 
-        elif rule == "sw*sh":
-            return base_qty * SW * SH
-
-        elif rule == "surface_area_ratio":
+        # Upholstery / fabric
+        elif rule == "surface area":
             ratio = self.surface_area_ratio(L1, W1, H1, L0, W0, H0)
             return base_qty * ratio
 
-        elif rule == "round(base*sl)":
+        # Count-based items that depend mainly on sofa length
+        elif rule == "count by length":
             return math.ceil(base_qty * SL)
 
-        elif rule == "round((45/11)*springs_new)":
+        # Count-based items that depend mainly on height / back size
+        elif rule == "count by height":
+            return math.ceil(base_qty * SH)
+
+        # Clips derived from number of springs
+        elif rule == "derived from springs":
             if springs_new is None:
-                raise ValueError("springs_new must be provided for clip calculation")
-            return math.ceil((45 / 11) * springs_new)
+                raise ValueError(
+                    f"springs_new is required for component '{component_name}' with rule 'Derived from Springs'"
+                )
+            # Keep same clip-to-spring ratio as base sofa
+            return math.ceil((base_qty / 11.0) * springs_new)
+
+        # No scaling
+        elif rule == "fixed":
+            return base_qty
 
         else:
             raise ValueError(
@@ -185,22 +220,32 @@ class SofaCostEngine:
     # 6. GENERATE SCALED BOM
     # ---------------------------------------------------
     def generate_scaled_bom(self, length_mm, width_mm, height_mm):
+        """
+        master_template_spec.csv expected columns:
+            component_group,base_qty,unit,scaling_rule,notes
+        """
         scales = self.compute_scale_factors(length_mm, width_mm, height_mm)
 
         scaled_rows = []
         springs_new = None
 
-        # First pass: everything except clips
+        # First pass: scale everything except clip-derived rows
         for _, row in self.master_bom.iterrows():
             component = str(row["component_group"]).strip()
             base_qty = float(row["base_qty"])
-            unit = row["unit"]
-            scaling_rule = row["scaling_rule"]
+            unit = str(row["unit"]).strip()
+            scaling_rule = str(row["scaling_rule"]).strip()
+            notes = row["notes"] if "notes" in row and pd.notna(row["notes"]) else ""
 
-            if str(scaling_rule).strip().lower() == "round((45/11)*springs_new)":
+            if scaling_rule.strip().lower() == "derived from springs":
                 continue
 
-            new_qty = self.scale_component(component, base_qty, scaling_rule, scales)
+            new_qty = self.scale_component(
+                component_name=component,
+                base_qty=base_qty,
+                scaling_rule=scaling_rule,
+                scales=scales
+            )
 
             if component.lower() == "springs":
                 springs_new = new_qty
@@ -210,31 +255,39 @@ class SofaCostEngine:
                 "base_qty": base_qty,
                 "unit": unit,
                 "scaling_rule": scaling_rule,
-                "new_qty": new_qty
+                "new_qty": new_qty,
+                "notes": notes
             })
 
-        # Second pass: clips
+        # Second pass: components derived from springs (clips)
         for _, row in self.master_bom.iterrows():
             component = str(row["component_group"]).strip()
             base_qty = float(row["base_qty"])
-            unit = row["unit"]
-            scaling_rule = row["scaling_rule"]
+            unit = str(row["unit"]).strip()
+            scaling_rule = str(row["scaling_rule"]).strip()
+            notes = row["notes"] if "notes" in row and pd.notna(row["notes"]) else ""
 
-            if str(scaling_rule).strip().lower() == "round((45/11)*springs_new)":
+            if scaling_rule.strip().lower() == "derived from springs":
                 new_qty = self.scale_component(
-                    component, base_qty, scaling_rule, scales, springs_new=springs_new
+                    component_name=component,
+                    base_qty=base_qty,
+                    scaling_rule=scaling_rule,
+                    scales=scales,
+                    springs_new=springs_new
                 )
+
                 scaled_rows.append({
                     "component_group": component,
                     "base_qty": base_qty,
                     "unit": unit,
                     "scaling_rule": scaling_rule,
-                    "new_qty": new_qty
+                    "new_qty": new_qty,
+                    "notes": notes
                 })
 
         bom_df = pd.DataFrame(scaled_rows)
 
-        # keep same order as master BOM CSV
+        # Keep same order as master BOM
         component_order = self.master_bom["component_group"].tolist()
         bom_df["component_group"] = pd.Categorical(
             bom_df["component_group"],
@@ -250,10 +303,8 @@ class SofaCostEngine:
     # ---------------------------------------------------
     def generate_fusion_scaled_components(self, scales):
         """
-        Generate a Fusion-aware component scaling report using fusion_component_map.csv.
-
-        Expected fusion_component_map.csv columns:
-        fusion_component_name,component_group,scale_mode,cost_group,notes
+        fusion_component_map.csv expected columns:
+            fusion_component_name,component_group,scale_mode,cost_group,notes
         """
         if self.fusion_map is None:
             return None
@@ -261,7 +312,7 @@ class SofaCostEngine:
         fusion_rows = []
         springs_new = None
 
-        # First pass: compute everything except clip rows
+        # First pass: everything except clip-derived rows
         for _, row in self.fusion_map.iterrows():
             fusion_component = str(row["fusion_component_name"]).strip()
             component_group = str(row["component_group"]).strip()
@@ -269,7 +320,9 @@ class SofaCostEngine:
             cost_group = str(row["cost_group"]).strip()
             notes = row["notes"] if "notes" in row and pd.notna(row["notes"]) else ""
 
-            # Find matching BOM row by component_group
+            if scale_mode.lower() == "derived from springs":
+                continue
+
             match = self.master_bom[
                 self.master_bom["component_group"].astype(str).str.strip().str.lower()
                 == component_group.lower()
@@ -277,14 +330,10 @@ class SofaCostEngine:
 
             if match.empty:
                 raise ValueError(
-                    f"No base BOM component found for fusion component group '{component_group}'"
+                    f"No matching component_group '{component_group}' found in master_template_spec.csv"
                 )
 
             base_qty = float(match.iloc[0]["base_qty"])
-
-            # Skip clip row for second pass
-            if scale_mode.lower() == "round((45/11)*springs_new)":
-                continue
 
             new_qty = self.scale_component(
                 component_name=component_group,
@@ -306,7 +355,7 @@ class SofaCostEngine:
                 "notes": notes
             })
 
-        # Second pass: clip rows that depend on springs_new
+        # Second pass: clip-derived rows
         for _, row in self.fusion_map.iterrows():
             fusion_component = str(row["fusion_component_name"]).strip()
             component_group = str(row["component_group"]).strip()
@@ -314,7 +363,7 @@ class SofaCostEngine:
             cost_group = str(row["cost_group"]).strip()
             notes = row["notes"] if "notes" in row and pd.notna(row["notes"]) else ""
 
-            if scale_mode.lower() == "round((45/11)*springs_new)":
+            if scale_mode.lower() == "derived from springs":
                 match = self.master_bom[
                     self.master_bom["component_group"].astype(str).str.strip().str.lower()
                     == component_group.lower()
@@ -322,7 +371,7 @@ class SofaCostEngine:
 
                 if match.empty:
                     raise ValueError(
-                        f"No base BOM component found for fusion component group '{component_group}'"
+                        f"No matching component_group '{component_group}' found in master_template_spec.csv"
                     )
 
                 base_qty = float(match.iloc[0]["base_qty"])
@@ -353,16 +402,21 @@ class SofaCostEngine:
     # ---------------------------------------------------
     def compute_cost(self, bom_df):
         """
-        Expected cost_sheet.csv format:
-        material_component,unit_cost,unit
-        Wood Frame,5000,base unit
-        ...
-        Labor,4000,per sofa
-        PVD / Finishing,2500,per sofa
-        Overhead %,10,%
-        Profit Margin %,20,%
+        cost_sheet.csv expected columns:
+            material_component,unit_cost,unit
+
+        Example:
+            material_component,unit_cost,unit
+            Wood Frame,5000,base unit
+            Plywood,1200,base unit
+            ...
+            Labor,4000,per sofa
+            PVD / Finishing,2500,per sofa
+            Overhead %,10,%
+            Profit Margin %,20,%
         """
         cost_map = {}
+
         for _, row in self.cost_sheet.iterrows():
             name = str(row["material_component"]).strip().lower()
             cost_map[name] = float(row["unit_cost"])
@@ -392,6 +446,12 @@ class SofaCostEngine:
         cost_df = pd.DataFrame(cost_rows)
 
         material_cost = cost_df["total_cost"].sum()
+
+        required_keys = ["labor", "pvd / finishing", "overhead %", "profit margin %"]
+        for key in required_keys:
+            if key not in cost_map:
+                raise ValueError(f"Missing '{key}' in cost_sheet.csv")
+
         labor_cost = cost_map["labor"]
         finishing_cost = cost_map["pvd / finishing"]
         overhead_pct = cost_map["overhead %"]
@@ -451,9 +511,9 @@ class SofaCostEngine:
         cost_df, summary = self.compute_cost(bom_df)
 
         bom_path, quote_csv_path, quote_json_path, fusion_csv_path = self.save_outputs(
-            bom_df,
-            cost_df,
-            summary,
+            bom_df=bom_df,
+            cost_df=cost_df,
+            summary=summary,
             fusion_df=fusion_df,
             output_prefix=output_prefix
         )

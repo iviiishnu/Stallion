@@ -1,8 +1,4 @@
 parameter,symbol,value_mm
-sofa_length,L0,2100
-sofa_width,W0,900
-sofa_height,H0,850
-seat_height,SH0,450
-seat_depth,SD0,600
-arm_width,AW0,120
-backrest_height,BH0,420
+Base Sofa Length,L0,2100
+Base Sofa Width,W0,900
+Base Sofa Height,H0,850

@@ -1,8 +1,7 @@
 material_component,unit_cost,unit
 Wood Frame,5000,base unit
 Plywood,1200,base unit
-Seat Foam,2500,base unit
-Back Foam,1800,base unit
+Foam,4300,base unit
 Handle Foam,800,base unit
 Fabric,2200,base unit
 Springs,120,each
