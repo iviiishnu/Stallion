@@ -1,0 +1,11 @@
+component_group,base_qty,unit,scaling_rule,notes
+Wood Frame,1,base unit,3D Volume,Complete wooden frame assembly for the master sofa
+Plywood,1,base unit,Area,Complete plywood/support panel assembly for the master sofa
+Foam,1,base unit,Area/Volume,Main seat + back foam assembly for the master sofa
+Handle Foam,1,base unit,Area/Volume,Arm/handle foam assembly for the master sofa
+Fabric,1,base unit,Surface Area,Complete upholstery/fabric assembly for the master sofa
+Springs,11,count,Count by Length,Seat spring elements from Fusion master model
+Clips,45,count,Derived from Springs,Clip hardware associated with spring assembly
+Seat Belts,3,count,Count by Length,Seat support belts/webbing from Fusion master model
+Back Rest Belts,15,count,Count by Height,Back support belts/webbing from Fusion master model
+Handle Frame,1,base unit,Area/Volume,Complete handle/arm internal frame assembly for the master sofa

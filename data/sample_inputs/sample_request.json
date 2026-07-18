@@ -1,0 +1,11 @@
+{
+  "request_id": "demo_001",
+  "customer_name": "test_customer",
+  "sofa_type": "3_seater",
+  "image_path": "data/sample_inputs/sample_3seater_01.jpg",
+  "dimensions_mm": {
+    "length": 2400,
+    "width": 950,
+    "height": 900
+  }
+}
