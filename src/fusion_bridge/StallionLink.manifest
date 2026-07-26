@@ -1,0 +1,10 @@
+{
+    "autodeskProduct":    "Fusion",
+    "type":    "script",
+    "author":    "Stallion AI Costing Engine",
+    "description":    {
+        "":    "Links the web application's JSON quotation output to the active Fusion 360 parametric design."
+    },
+    "supportedOS":    "windows|mac",
+    "editEnabled":    true
+}

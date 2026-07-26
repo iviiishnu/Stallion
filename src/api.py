@@ -179,6 +179,7 @@ async def create_quote(
         length_mm=length_mm,
         width_mm=width_mm,
         height_mm=height_mm,
+        sofa_type=sofa_result.get("predicted_type", "3-seater"),
         output_prefix=request_id,
     )
 
@@ -223,7 +224,7 @@ async def create_quote(
         json.dump({
             "request_id":    request_id,
             "customer_name": customer_name,
-            "sofa_type":     "3_seater",
+            "sofa_type":     sofa_result.get("predicted_type", "3-seater"),
             "image_path":    str(image_path),
             "dimensions_mm": {"length": length_mm, "width": width_mm, "height": height_mm},
         }, f, indent=4)

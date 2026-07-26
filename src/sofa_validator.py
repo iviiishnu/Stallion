@@ -76,7 +76,7 @@ _RATIO_RULES = [
     ("4_seater_plus", 3.20,  float("inf")),
 ]
 
-SUPPORTED_TYPE = "3_seater"   # only type allowed through to the cost engine
+SUPPORTED_TYPES = ["1_seater", "2_seater", "3_seater", "4_seater_plus", "l_shape"]
 
 _TYPE_LABELS = {
     "1_seater":      "1-seater (armchair)",
@@ -268,7 +268,7 @@ def _classify_type(detections):
 def _draw_annotated(image_bgr, detections, sofa_type, request_folder, ext=".jpg"):
     """Draw bounding boxes + label on a copy of the image and save it."""
     annotated = image_bgr.copy()
-    colour = (0, 200, 0) if sofa_type == SUPPORTED_TYPE else (0, 60, 220)
+    colour = (0, 200, 0) if sofa_type in SUPPORTED_TYPES else (0, 60, 220)
 
     for det in detections:
         x1, y1, x2, y2 = [int(v) for v in det["bbox"]]
@@ -369,11 +369,10 @@ def validate_sofa(image_path, request_folder, detector=None):
                                      request_folder, write_ext)
 
     # ── Gate 2: unsupported sofa type ───────────────────────────────────────
-    if sofa_type != SUPPORTED_TYPE:
+    if sofa_type not in SUPPORTED_TYPES:
         human_label = _TYPE_LABELS.get(sofa_type, sofa_type)
         error_msg   = (
             f"Dimensions for {human_label} not available. "
-            f"Only 3-seater sofa is currently supported."
         )
         analysis = {
             "validation_passed":    False,
@@ -391,7 +390,7 @@ def validate_sofa(image_path, request_folder, detector=None):
         _save_analysis(analysis, request_folder)
         raise SofaValidationError(error_msg)
 
-    # ── All clear: 3-seater ─────────────────────────────────────────────────
+    # ── All clear ─────────────────────────────────────────────────
     analysis = {
         "validation_passed":    True,
         "detected_object":      "sofa",

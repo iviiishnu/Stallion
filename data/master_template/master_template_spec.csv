@@ -1,11 +1,11 @@
-component_group,base_qty,unit,scaling_rule,notes
-Wood Frame,1,base unit,3D Volume,Complete wooden frame assembly for the master sofa
-Plywood,1,base unit,Area,Complete plywood/support panel assembly for the master sofa
-Foam,1,base unit,Area/Volume,Main seat + back foam assembly for the master sofa
-Handle Foam,1,base unit,Area/Volume,Arm/handle foam assembly for the master sofa
-Fabric,1,base unit,Surface Area,Complete upholstery/fabric assembly for the master sofa
-Springs,11,count,Count by Length,Seat spring elements from Fusion master model
-Clips,45,count,Derived from Springs,Clip hardware associated with spring assembly
-Seat Belts,3,count,Count by Length,Seat support belts/webbing from Fusion master model
-Back Rest Belts,15,count,Count by Height,Back support belts/webbing from Fusion master model
-Handle Frame,1,base unit,Area/Volume,Complete handle/arm internal frame assembly for the master sofa
+Component Name,Unit of Measurement,1-Seater - Qty,2-Seater - Qty,3-Seater - Qty,4-Seater - Qty,L-Shape (Left) - Qty,L-Shape (Right) - Qty
+Wood Frame,cubic feet,3.2,4.6,6.0,7.4,8.8,8.8
+Plywood,square meters,1.1,1.6,2.1,2.6,3.1,3.1
+Seat Foam,kg,4.0,8.0,12.0,16.0,18.0,18.0
+Back Foam,kg,2.5,5.0,7.5,10.0,11.0,11.0
+Fabric,square meters,5.0,7.5,10.0,12.5,13.5,13.5
+Springs,pieces,8.0,14.0,20.0,26.0,30.0,30.0
+Adhesive,kg,0.4,0.6,0.8,1.0,1.1,1.1
+Thread,cones,1.0,1.0,2.0,2.0,2.0,2.0
+Legs,pieces,4.0,4.0,4.0,6.0,6.0,6.0
+Hardware,pieces,6.0,10.0,14.0,18.0,20.0,20.0

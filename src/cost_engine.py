@@ -61,6 +61,29 @@ class SofaCostEngine:
         self.master_bom = None
         self.cost_sheet = None
         self.fusion_map = None
+        
+        # Scaling rules mapping (since new Excel removed this column)
+        self.DEFAULT_SCALING_RULES = {
+            "wood frame": "3d volume",
+            "plywood": "area",
+            "seat foam": "area/volume",
+            "back foam": "area/volume",
+            "handle foam": "area/volume",
+            "fabric": "surface area",
+            "springs": "count by length",
+            "clips": "derived from springs",
+            "seat belts": "count by length",
+            "back rest belts": "count by height",
+            "handle frame": "area/volume",
+            "adhesive": "3d volume",
+            "thread": "surface area",
+            "legs": "fixed",
+            "hardware": "count by length"
+        }
+        
+        # Dynamic dimension baselines and limits
+        self.TYPE_BASE_DIMS = {}
+        self.TYPE_LIMITS = {}
 
     # ---------------------------------------------------
     # 1. LOAD DATA
@@ -76,53 +99,69 @@ class SofaCostEngine:
             self.fusion_map = None
 
         print("Loaded:")
-        print(f"  master_dimensions -> {self.master_dim_path}")
-        print(f"  master_template_spec -> {self.master_bom_path}")
-        print(f"  cost_sheet -> {self.cost_sheet_path}")
+        files = {
+            "master_dimensions": self.master_dim_path,
+            "master_template_spec": self.master_bom_path,
+            "cost_sheet": self.cost_sheet_path
+        }
         if self.fusion_map is not None:
-            print(f"  fusion_component_map -> {self.fusion_map_path}")
-        else:
-            print("  fusion_component_map -> NOT FOUND (Fusion report will be skipped)")
+            files["fusion_component_map"] = self.fusion_map_path
+            
+        print("Loaded:")
+        for name, path in files.items():
+            print(f"  {name} -> {path}")
+            
+        # Parse master_dimensions into our runtime dictionaries
+        for _, row in self.master_dimensions.iterrows():
+            variant = str(row["variant"]).strip().lower()
+            if not variant:
+                continue
+            self.TYPE_BASE_DIMS[variant] = (
+                float(row["base_length"]),
+                float(row["base_width"]),
+                float(row["base_height"])
+            )
+            self.TYPE_LIMITS[variant] = {
+                "min_l": float(row["min_length"]), "max_l": float(row["max_length"]),
+                "min_w": float(row["min_width"]), "max_w": float(row["max_width"]),
+                "min_h": float(row["min_height"]), "max_h": float(row["max_height"])
+            }
 
     # ---------------------------------------------------
     # 2. GET BASE DIMENSIONS
     # ---------------------------------------------------
-    def get_base_dimensions(self):
+    def get_base_dimensions(self, sofa_type="3-seater"):
         """
-        master_dimensions.csv expected columns:
-            parameter,symbol,value_mm
-
-        Example:
-            parameter,symbol,value_mm
-            Base Sofa Length,L0,2100
-            Base Sofa Width,W0,900
-            Base Sofa Height,H0,850
+        Retrieves L0, W0, H0 for the requested sofa type.
         """
-        dim_map = {}
-
-        for _, row in self.master_dimensions.iterrows():
-            symbol = str(row["symbol"]).strip()
-            value = float(row["value_mm"])
-            dim_map[symbol] = value
-
-        required = ["L0", "W0", "H0"]
-        for key in required:
-            if key not in dim_map:
-                raise ValueError(f"Missing '{key}' in master_dimensions.csv")
-
-        return dim_map["L0"], dim_map["W0"], dim_map["H0"]
+        sofa_type = str(sofa_type).lower().strip()
+        if sofa_type in self.TYPE_BASE_DIMS:
+            return self.TYPE_BASE_DIMS[sofa_type]
+        else:
+            print(f"Warning: Unknown sofa type '{sofa_type}', defaulting to 3-seater baselines.")
+            return self.TYPE_BASE_DIMS.get("3-seater", (2100, 900, 850))
 
     # ---------------------------------------------------
     # 3. COMPUTE SCALE FACTORS
     # ---------------------------------------------------
-    def compute_scale_factors(self, length_mm, width_mm, height_mm):
+    def compute_scale_factors(self, length_mm, width_mm, height_mm, sofa_type="3-seater"):
         for name, value in (("length_mm", length_mm), ("width_mm", width_mm), ("height_mm", height_mm)):
             if not isinstance(value, (int, float)) or isinstance(value, bool):
                 raise ValueError(f"'{name}' must be a number, got {value!r}")
             if value <= 0:
                 raise ValueError(f"'{name}' must be a positive number, got {value}")
+                
+        sofa_type = str(sofa_type).lower().strip()
+        if sofa_type in self.TYPE_LIMITS:
+            limits = self.TYPE_LIMITS[sofa_type]
+            if not (limits["min_l"] <= length_mm <= limits["max_l"]):
+                raise ValueError(f"Length {length_mm}mm out of bounds for {sofa_type}. Must be between {limits['min_l']} and {limits['max_l']}.")
+            if not (limits["min_w"] <= width_mm <= limits["max_w"]):
+                raise ValueError(f"Width {width_mm}mm out of bounds for {sofa_type}. Must be between {limits['min_w']} and {limits['max_w']}.")
+            if not (limits["min_h"] <= height_mm <= limits["max_h"]):
+                raise ValueError(f"Height {height_mm}mm out of bounds for {sofa_type}. Must be between {limits['min_h']} and {limits['max_h']}.")
 
-        L0, W0, H0 = self.get_base_dimensions()
+        L0, W0, H0 = self.get_base_dimensions(sofa_type)
 
         SL = length_mm / L0
         SW = width_mm / W0
@@ -225,23 +264,40 @@ class SofaCostEngine:
     # ---------------------------------------------------
     # 6. GENERATE SCALED BOM
     # ---------------------------------------------------
-    def generate_scaled_bom(self, length_mm, width_mm, height_mm):
+    def generate_scaled_bom(self, length_mm, width_mm, height_mm, sofa_type="3-seater"):
         """
-        master_template_spec.csv expected columns:
-            component_group,base_qty,unit,scaling_rule,notes
+        master_template_spec.csv now has columns like '3-Seater - Qty', '1-Seater - Qty'
         """
-        scales = self.compute_scale_factors(length_mm, width_mm, height_mm)
+        scales = self.compute_scale_factors(length_mm, width_mm, height_mm, sofa_type)
 
         scaled_rows = []
         springs_new = None
+        
+        type_key = str(sofa_type).lower().strip()
+        col_map = {
+            "1-seater": "1-Seater - Qty",
+            "2-seater": "2-Seater - Qty",
+            "3-seater": "3-Seater - Qty",
+            "4-seater": "4-Seater - Qty",
+            "l-shape": "L-Shape (Left) - Qty"
+        }
+        qty_col = col_map.get(type_key, "3-Seater - Qty")
 
         # First pass: scale everything except clip-derived rows
         for _, row in self.master_bom.iterrows():
-            component = str(row["component_group"]).strip()
-            base_qty = float(row["base_qty"])
-            unit = str(row["unit"]).strip()
-            scaling_rule = str(row["scaling_rule"]).strip()
-            notes = row["notes"] if "notes" in row and pd.notna(row["notes"]) else ""
+            component = str(row["Component Name"]).strip()
+            
+            # Skip if this component doesn't have a quantity for this type
+            if qty_col not in row or pd.isna(row[qty_col]):
+                continue
+                
+            base_qty = float(row[qty_col])
+            if base_qty == 0:
+                continue
+                
+            unit = str(row["Unit of Measurement"]).strip()
+            scaling_rule = self.DEFAULT_SCALING_RULES.get(component.lower(), "fixed")
+            notes = ""
 
             if scaling_rule.strip().lower() == "derived from springs":
                 continue
@@ -267,11 +323,15 @@ class SofaCostEngine:
 
         # Second pass: components derived from springs (clips)
         for _, row in self.master_bom.iterrows():
-            component = str(row["component_group"]).strip()
-            base_qty = float(row["base_qty"])
-            unit = str(row["unit"]).strip()
-            scaling_rule = str(row["scaling_rule"]).strip()
-            notes = row["notes"] if "notes" in row and pd.notna(row["notes"]) else ""
+            component = str(row["Component Name"]).strip()
+            if qty_col not in row or pd.isna(row[qty_col]):
+                continue
+            base_qty = float(row[qty_col])
+            if base_qty == 0:
+                continue
+            unit = str(row["Unit of Measurement"]).strip()
+            scaling_rule = self.DEFAULT_SCALING_RULES.get(component.lower(), "fixed")
+            notes = ""
 
             if scaling_rule.strip().lower() == "derived from springs":
                 new_qty = self.scale_component(
@@ -294,7 +354,7 @@ class SofaCostEngine:
         bom_df = pd.DataFrame(scaled_rows)
 
         # Keep same order as master BOM
-        component_order = self.master_bom["component_group"].tolist()
+        component_order = self.master_bom["Component Name"].tolist()
         bom_df["component_group"] = pd.Categorical(
             bom_df["component_group"],
             categories=component_order,
@@ -408,24 +468,34 @@ class SofaCostEngine:
     # ---------------------------------------------------
     def compute_cost(self, bom_df):
         """
-        cost_sheet.csv expected columns:
-            material_component,unit_cost,unit
-
-        Example:
-            material_component,unit_cost,unit
-            Wood Frame,5000,base unit
-            Plywood,1200,base unit
-            ...
-            Labor,4000,per sofa
-            PVD / Finishing,2500,per sofa
-            Overhead %,10,%
-            Profit Margin %,20,%
+        cost_sheet.csv new columns:
+            Component Name, Unit of Measurement, Cost per Unit (INR), Rate Type (Flat/Hourly/%), Value (INR or %)
         """
         cost_map = {}
+        
+        labor_cost = 0.0
+        finishing_cost = 0.0
+        overhead_pct = 12.0
+        profit_pct = 15.0
 
         for _, row in self.cost_sheet.iterrows():
-            name = str(row["material_component"]).strip().lower()
-            cost_map[name] = float(row["unit_cost"])
+            if pd.isna(row["Component Name"]):
+                continue
+            name = str(row["Component Name"]).strip().lower()
+            
+            if name == "materials":
+                continue
+                
+            if name == "labour":
+                labor_cost = float(row["Value (INR or %)"])
+            elif name == "finishing":
+                finishing_cost = float(row["Value (INR or %)"])
+            elif name == "overhead":
+                overhead_pct = float(row["Value (INR or %)"]) * 100
+            elif name == "profit margin":
+                profit_pct = float(row["Value (INR or %)"]) * 100
+            else:
+                cost_map[name] = float(row["Cost per Unit (INR)"])
 
         cost_rows = []
 
@@ -451,17 +521,7 @@ class SofaCostEngine:
 
         cost_df = pd.DataFrame(cost_rows)
 
-        material_cost = cost_df["total_cost"].sum()
-
-        required_keys = ["labor", "pvd / finishing", "overhead %", "profit margin %"]
-        for key in required_keys:
-            if key not in cost_map:
-                raise ValueError(f"Missing '{key}' in cost_sheet.csv")
-
-        labor_cost = cost_map["labor"]
-        finishing_cost = cost_map["pvd / finishing"]
-        overhead_pct = cost_map["overhead %"]
-        profit_pct = cost_map["profit margin %"]
+        material_cost = cost_df["total_cost"].sum() if not cost_df.empty else 0.0
 
         subtotal = material_cost + labor_cost + finishing_cost
         overhead = subtotal * (overhead_pct / 100.0)
@@ -509,11 +569,11 @@ class SofaCostEngine:
     # ---------------------------------------------------
     # 10. FULL PIPELINE
     # ---------------------------------------------------
-    def generate_quote(self, length_mm, width_mm, height_mm, output_prefix="quotation_output"):
+    def generate_quote(self, length_mm, width_mm, height_mm, sofa_type="3-seater", output_prefix="quotation_output"):
         self.load_data()
 
-        scales, bom_df = self.generate_scaled_bom(length_mm, width_mm, height_mm)
-        fusion_df = self.generate_fusion_scaled_components(scales)
+        scales, bom_df = self.generate_scaled_bom(length_mm, width_mm, height_mm, sofa_type)
+        fusion_df = None # self.generate_fusion_scaled_components(scales) -> Disabled temporarily as map needs update
         cost_df, summary = self.compute_cost(bom_df)
 
         bom_path, quote_csv_path, quote_json_path, fusion_csv_path = self.save_outputs(

@@ -739,6 +739,175 @@
     .btn-retry:hover { border-color: var(--accent); color: var(--accent); }
 
     /* ─────────────────────────────────────────────
+       FUSION 360 PANEL
+    ───────────────────────────────────────────── */
+    .fusion-panel {
+      margin-top: 1.25rem;
+      border-radius: var(--radius);
+      border: 1px solid rgba(99, 179, 237, 0.25);
+      background: linear-gradient(135deg, rgba(56,189,248,0.06), rgba(99,102,241,0.06));
+      overflow: hidden;
+    }
+
+    .fusion-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid rgba(99,179,237,0.15);
+    }
+
+    .fusion-logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, #0696d7, #0369a1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .fusion-header-info { flex: 1; }
+    .fusion-header-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .fusion-header-sub {
+      font-size: 0.72rem;
+      color: var(--text2);
+      margin-top: 2px;
+    }
+
+    .fusion-status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 99px;
+      background: rgba(16,185,129,0.12);
+      color: var(--success);
+      border: 1px solid rgba(16,185,129,0.25);
+    }
+    .fusion-status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      animation: blink 1.6s ease-in-out infinite;
+    }
+    @keyframes blink {
+      0%,100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .fusion-params {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: rgba(99,179,237,0.1);
+    }
+    .fusion-param {
+      padding: 1rem;
+      background: var(--bg);
+      text-align: center;
+    }
+    .fusion-param-name {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(99,179,237,0.7);
+      margin-bottom: 4px;
+    }
+    .fusion-param-val {
+      font-size: 1.3rem;
+      font-weight: 900;
+      color: #63b3ed;
+      letter-spacing: -0.5px;
+    }
+    .fusion-param-unit {
+      font-size: 0.68rem;
+      color: var(--text3);
+      margin-left: 2px;
+    }
+
+    .fusion-path-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0.875rem 1.25rem;
+      border-top: 1px solid rgba(99,179,237,0.1);
+      background: rgba(0,0,0,0.15);
+    }
+    .fusion-path-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--text3);
+      white-space: nowrap;
+    }
+    .fusion-path-val {
+      flex: 1;
+      font-size: 0.72rem;
+      color: var(--text2);
+      font-family: 'Courier New', monospace;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 10px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .fusion-copy-btn {
+      flex-shrink: 0;
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1px solid rgba(99,179,237,0.3);
+      background: rgba(99,179,237,0.08);
+      color: #63b3ed;
+      font-family: var(--font);
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+    .fusion-copy-btn:hover { background: rgba(99,179,237,0.18); }
+    .fusion-copy-btn.copied { color: var(--success); border-color: var(--success); background: var(--success-bg); }
+
+    .fusion-steps {
+      padding: 0.875rem 1.25rem;
+      border-top: 1px solid rgba(99,179,237,0.1);
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .fusion-steps-icon { font-size: 0.85rem; margin-top: 1px; flex-shrink: 0; }
+    .fusion-steps-text {
+      font-size: 0.75rem;
+      color: var(--text2);
+      line-height: 1.55;
+    }
+    .fusion-steps-text strong { color: var(--text); }
+    .fusion-steps-text code {
+      font-family: 'Courier New', monospace;
+      font-size: 0.72rem;
+      background: var(--surface);
+      padding: 1px 5px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      color: #63b3ed;
+    }
+
+    /* ─────────────────────────────────────────────
        RESPONSIVE
     ───────────────────────────────────────────── */
     @media (max-width: 600px) {
@@ -747,6 +916,8 @@
       .dim-row  { grid-template-columns: 1fr 1fr 1fr; }
       th, td { padding: 9px 10px; }
       .quote-final-price { font-size: 1.5rem; }
+      .fusion-params { grid-template-columns: 1fr 1fr 1fr; }
+      .fusion-path-row { flex-wrap: wrap; }
     }
   </style>
 </head>
@@ -781,7 +952,7 @@
           <input type="file" id="image-input" accept="image/jpeg,image/png,image/webp" />
           <div class="upload-icon">📷</div>
           <div class="upload-title">Drag & drop sofa image here</div>
-          <div class="upload-sub">JPG, PNG or WEBP — must be a 3-seater sofa</div>
+          <div class="upload-sub">JPG, PNG or WEBP</div>
         </div>
 
         <!-- Preview -->
@@ -954,6 +1125,54 @@
           </div>
           <div class="quote-final-price" id="final-price">₹—</div>
         </div>
+      </div>
+
+      <!-- ── FUSION 360 PANEL ─────────────────────────────── -->
+      <div class="section-label">Fusion 360 Model Update</div>
+      <div class="fusion-panel" id="fusion-panel">
+
+        <div class="fusion-header">
+          <div class="fusion-logo">⬡</div>
+          <div class="fusion-header-info">
+            <div class="fusion-header-title">StallionLink — Fusion 360 Parameters</div>
+            <div class="fusion-header-sub">These values are written to <code style="font-size:0.7rem;font-family:monospace;color:#63b3ed">input_request.json</code> and loaded by the Fusion script</div>
+          </div>
+          <div class="fusion-status-badge">
+            <div class="fusion-status-dot"></div>
+            Ready
+          </div>
+        </div>
+
+        <div class="fusion-params">
+          <div class="fusion-param">
+            <div class="fusion-param-name">Length</div>
+            <div><span class="fusion-param-val" id="fp-length">—</span><span class="fusion-param-unit">mm</span></div>
+          </div>
+          <div class="fusion-param">
+            <div class="fusion-param-name">Width</div>
+            <div><span class="fusion-param-val" id="fp-width">—</span><span class="fusion-param-unit">mm</span></div>
+          </div>
+          <div class="fusion-param">
+            <div class="fusion-param-name">Height</div>
+            <div><span class="fusion-param-val" id="fp-height">—</span><span class="fusion-param-unit">mm</span></div>
+          </div>
+        </div>
+
+        <div class="fusion-path-row">
+          <span class="fusion-path-label">JSON Path</span>
+          <span class="fusion-path-val" id="fp-path">—</span>
+          <button class="fusion-copy-btn" id="fp-copy-btn" title="Copy path to clipboard">📋 Copy</button>
+        </div>
+
+        <div class="fusion-steps">
+          <span class="fusion-steps-icon">💡</span>
+          <span class="fusion-steps-text">
+            In Fusion 360 press <strong>Shift + S</strong> → select <strong>StallionLink</strong> → click <strong>Run</strong>,
+            then open the file at the path above. The parameters <code>Length</code>, <code>Width</code> and <code>Height</code>
+            will be created or updated automatically in your model.
+          </span>
+        </div>
+
       </div>
 
     </section>
@@ -1231,6 +1450,26 @@
       document.getElementById('r-length').textContent = dims.length || '—';
       document.getElementById('r-width').textContent  = dims.width  || '—';
       document.getElementById('r-height').textContent = dims.height || '—';
+
+      // Fusion 360 panel
+      document.getElementById('fp-length').textContent = dims.length || '—';
+      document.getElementById('fp-width').textContent  = dims.width  || '—';
+      document.getElementById('fp-height').textContent = dims.height || '—';
+      const fusionPath = data.input_request_path || data.request_id
+        ? `outputs/requests/${data.request_id}/input_request.json`
+        : '—';
+      document.getElementById('fp-path').textContent = fusionPath;
+      document.getElementById('fp-path').title = fusionPath;
+
+      // Copy button
+      const copyBtn = document.getElementById('fp-copy-btn');
+      copyBtn.onclick = () => {
+        navigator.clipboard.writeText(fusionPath).then(() => {
+          copyBtn.textContent = '✓ Copied!';
+          copyBtn.classList.add('copied');
+          setTimeout(() => { copyBtn.textContent = '📋 Copy'; copyBtn.classList.remove('copied'); }, 2000);
+        });
+      };
 
       // BOM Table
       const tbody = document.getElementById('bom-tbody');

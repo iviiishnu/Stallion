@@ -1,15 +1,16 @@
-material_component,unit_cost,unit
-Wood Frame,5000,base unit
-Plywood,1200,base unit
-Foam,4300,base unit
-Handle Foam,800,base unit
-Fabric,2200,base unit
-Springs,120,each
-Clips,8,each
-Seat Belts,150,each
-Back Rest Belts,90,each
-Handle Frame,900,base unit
-Labor,4000,per sofa
-PVD / Finishing,2500,per sofa
-Overhead %,10,%
-Profit Margin %,20,%
+Component Name,Unit of Measurement,Cost per Unit (INR),Rate Type (Flat/Hourly/%),Value (INR or %)
+MATERIALS,,,,
+Wood Frame,cubic feet,850.0,,
+Plywood,square meters,620.0,,
+Seat Foam,kg,210.0,,
+Back Foam,kg,180.0,,
+Fabric,square meters,450.0,,
+Springs,pieces,25.0,,
+Adhesive,kg,140.0,,
+Thread,cones,60.0,,
+Legs,pieces,90.0,,
+Hardware,pieces,15.0,,
+Labour,,,Flat per sofa (or Hourly),3500.0
+Finishing,,,Flat per sofa,1200.0
+Overhead,,,%,0.12
+Profit Margin,,,%,0.15

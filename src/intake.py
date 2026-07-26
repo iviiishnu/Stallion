@@ -137,7 +137,7 @@ def main():
     print(f"  Confidence: {sofa_result['confidence']:.0%}")
     print(f"  BBox      : {sofa_result['bbox']}")
     print(f"  Aspect ratio: {sofa_result['aspect_ratio']}")
-    print("  ✅ 3-seater confirmed — proceeding to cost engine")
+    print(f"  ✅ {sofa_result['predicted_type']} confirmed — proceeding to cost engine")
 
     # --- Phase 1: cost engine (unchanged) ---
     dims = request_data["dimensions_mm"]
@@ -146,6 +146,7 @@ def main():
         length_mm=dims["length"],
         width_mm=dims["width"],
         height_mm=dims["height"],
+        sofa_type=sofa_result['predicted_type'],
         output_prefix=request_id,
     )
 

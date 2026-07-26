@@ -1,4 +1,6 @@
-parameter,symbol,value_mm
-Base Sofa Length,L0,2100
-Base Sofa Width,W0,900
-Base Sofa Height,H0,850
+variant,min_length,max_length,min_width,max_width,min_height,max_height,base_length,base_width,base_height
+1-seater,700,1000,750,950,750,950,850,850,850
+2-seater,1300,1800,800,1000,750,950,1550,900,850
+3-seater,1800,2400,850,1000,750,950,2100,900,850
+4-seater,2400,3000,850,1050,750,950,2700,950,850
+l-shape,2200,3200,850,1100,750,950,2700,975,850
