@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stallion — Sofa Costing &amp; CAD</title>
+  <meta name="description" content="Upload a sofa photo and dimensions to get a costed bill of materials and a 3D CAD model with the full internal structure." />
+  <!-- All assets are local: this app makes no external network calls. -->
+  <link href="/static/vendor/fonts/inter.css" rel="stylesheet" />
+  <script>
+    // Theme before first paint (saved choice, else system preference)
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('stallion-theme'); } catch (e) {}
+      if (!t) t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', t);
+    })();
+    // Keep model-viewer's optional decoders local (never fetched from a CDN)
+    self.ModelViewerElement = Object.assign(self.ModelViewerElement || {}, {
+      dracoDecoderLocation: "/static/vendor/draco/",
+      ktx2TranscoderLocation: "/static/vendor/basis/",
+      lottieLoaderLocation: "/static/vendor/lottie/LottieLoader.js",
+    });
+  </script>
+  <script type="module" src="/static/vendor/model-viewer.min.js"></script>
+
+  <style>
+    /* ───────────────────────── Tokens ───────────────────────── */
+    :root {
+      --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      --mono: ui-monospace, 'Cascadia Code', 'SFMono-Regular', Consolas, monospace;
+      --r-lg: 16px; --r-md: 12px; --r-sm: 8px;
+      --ease: cubic-bezier(.2, .7, .2, 1);
+
+      --bg: #f5f5f3;
+      --panel: #ffffff;
+      --panel-2: #fafaf8;
+      --line: #e6e5e1;
+      --line-2: #d8d6d0;
+      --ink: #17171a;
+      --ink-2: #55555c;
+      --ink-3: #8b8b93;
+      --accent: #b4532a;          /* copper */
+      --accent-ink: #ffffff;
+      --accent-soft: #f6e9e2;
+      --primary: #17171a;         /* ink buttons */
+      --primary-ink: #ffffff;
+      --ok: #1f8a5b;  --ok-soft: #e3f3eb;
+      --warn: #b7791f; --warn-soft: #fbf1dc;
+      --bad: #c0392b;  --bad-soft: #fbe7e4;
+      --shadow: 0 1px 2px rgba(20, 20, 30, .04), 0 8px 24px rgba(20, 20, 30, .06);
+      --viewer-bg: radial-gradient(ellipse at 50% 40%, #fdfdfc 0%, #e9e8e4 100%);
+    }
+    :root[data-theme="dark"] {
+      --bg: #0f1012;
+      --panel: #17181b;
+      --panel-2: #1c1d21;
+      --line: #2a2b30;
+      --line-2: #35363c;
+      --ink: #ededee;
+      --ink-2: #a6a6ad;
+      --ink-3: #6f7078;
+      --accent: #e0875c;
+      --accent-ink: #1a0f0a;
+      --accent-soft: #2e1f18;
+      --primary: #ededee;
+      --primary-ink: #111113;
+      --ok: #4cc38a;  --ok-soft: #14271e;
+      --warn: #e2b04a; --warn-soft: #2b2313;
+      --bad: #f07a6b;  --bad-soft: #2e1817;
+      --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
+      --viewer-bg: radial-gradient(ellipse at 50% 40%, #2a2c31 0%, #141518 100%);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      font-family: var(--font); font-size: 14px; line-height: 1.5;
+      background: var(--bg); color: var(--ink);
+      -webkit-font-smoothing: antialiased;
+      font-feature-settings: "cv11", "ss01";
+    }
+    button, input, select { font: inherit; color: inherit; }
+    img { max-width: 100%; display: block; }
+    .num { font-variant-numeric: tabular-nums; }
+    .hidden { display: none !important; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+    svg.i { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    svg.i.sm { width: 15px; height: 15px; }
+
+    /* ───────────────────────── Top bar ───────────────────────── */
+    .topbar {
+      position: sticky; top: 0; z-index: 20;
+      display: flex; align-items: center; gap: 16px;
+      height: 60px; padding: 0 24px;
+      background: color-mix(in srgb, var(--bg) 85%, transparent);
+      backdrop-filter: saturate(1.4) blur(12px);
+      border-bottom: 1px solid var(--line);
+    }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
+    .brand-mark {
+      width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center;
+      background: var(--ink); color: var(--bg);
+    }
+    .brand-mark svg { width: 18px; height: 18px; }
+    .brand-name { font-weight: 700; letter-spacing: .08em; font-size: 14px; }
+    .brand-sub { color: var(--ink-3); font-size: 13px; padding-left: 10px; border-left: 1px solid var(--line-2); }
+    .topbar .spacer { flex: 1; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
+      border: 1px solid var(--line); border-radius: 999px; font-size: 12px; color: var(--ink-2); background: var(--panel);
+    }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
+    .icon-btn {
+      width: 34px; height: 34px; display: grid; place-items: center; cursor: pointer;
+      border: 1px solid var(--line); border-radius: 9px; background: var(--panel); color: var(--ink-2);
+      transition: border-color .2s var(--ease), color .2s var(--ease);
+    }
+    .icon-btn:hover { color: var(--ink); border-color: var(--line-2); }
+
+    /* ───────────────────────── Layout ───────────────────────── */
+    .app {
+      display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 24px;
+      max-width: 1480px; margin: 0 auto; padding: 24px;
+    }
+    .panel {
+      background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow);
+    }
+    .side { position: sticky; top: 84px; align-self: start; max-height: calc(100vh - 108px); overflow: auto; }
+    .side-inner { padding: 20px; }
+    .side h2 { font-size: 15px; margin: 0 0 2px; font-weight: 650; letter-spacing: -.01em; }
+    .muted { color: var(--ink-3); }
+    .side .lead { font-size: 13px; color: var(--ink-3); margin: 0 0 18px; }
+    .field-label {
+      display: flex; justify-content: space-between; align-items: baseline;
+      font-size: 12px; font-weight: 600; color: var(--ink-2); margin: 18px 0 8px;
+      text-transform: uppercase; letter-spacing: .06em;
+    }
+    .field-label .opt { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--ink-3); }
+
+    /* Dropzone */
+    .drop {
+      position: relative; display: block; border: 1.5px dashed var(--line-2); border-radius: var(--r-md);
+      background: var(--panel-2); padding: 22px 16px; text-align: center; cursor: pointer;
+      transition: border-color .2s var(--ease), background .2s var(--ease);
+    }
+    .drop:hover, .drop.over { border-color: var(--accent); background: var(--accent-soft); }
+    .drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .drop-icon { width: 40px; height: 40px; margin: 0 auto 10px; border-radius: 10px; display: grid; place-items: center; background: var(--panel); border: 1px solid var(--line); color: var(--ink-2); }
+    .drop-title { font-weight: 600; }
+    .drop-sub { font-size: 12px; color: var(--ink-3); margin-top: 2px; }
+    .file {
+      display: grid; grid-template-columns: 64px 1fr auto; gap: 12px; align-items: center;
+      border: 1px solid var(--line); border-radius: var(--r-md); padding: 8px; background: var(--panel-2);
+    }
+    .file img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; background: var(--line); }
+    .file-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .file-meta { font-size: 12px; color: var(--ink-3); }
+
+    /* Inputs */
+    .presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .chip {
+      height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel);
+      font-size: 12px; color: var(--ink-2); cursor: pointer; transition: all .15s var(--ease);
+    }
+    .chip:hover { border-color: var(--line-2); color: var(--ink); }
+    .chip.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+    .dims { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .input {
+      display: flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+      transition: border-color .15s var(--ease), box-shadow .15s var(--ease); min-width: 0;
+    }
+    .input:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .input.warn { border-color: var(--warn); }
+    .input input, .input select {
+      width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; padding: 9px 10px; font-variant-numeric: tabular-nums;
+    }
+    .input select option { color: #111; }
+    .input .unit { padding-right: 10px; font-size: 12px; color: var(--ink-3); }
+    .input-cap { font-size: 11px; color: var(--ink-3); margin: 4px 2px 0; }
+    .hint { font-size: 12px; color: var(--warn); margin-top: 8px; display: none; }
+    .hint.show { display: block; }
+    details.more { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 14px; }
+    details.more summary {
+      list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+      font-size: 13px; font-weight: 600; color: var(--ink-2);
+    }
+    details.more summary::-webkit-details-marker { display: none; }
+    details.more summary svg { transition: transform .2s var(--ease); }
+    details.more[open] summary svg { transform: rotate(180deg); }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      height: 40px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--line);
+      background: var(--panel); color: var(--ink); font-weight: 600; cursor: pointer; text-decoration: none;
+      transition: transform .15s var(--ease), background .2s var(--ease), border-color .2s var(--ease), opacity .2s;
+      white-space: nowrap;
+    }
+    .btn:hover { border-color: var(--line-2); }
+    .btn:active { transform: translateY(1px); }
+    .btn.primary { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
+    .btn.accent { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+    .btn.block { width: 100%; height: 46px; margin-top: 20px; font-size: 14px; }
+    .btn:disabled { opacity: .35; cursor: not-allowed; transform: none; }
+    .btn.sm { height: 32px; padding: 0 12px; font-size: 13px; border-radius: 8px; }
+    .side-foot { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-3); margin-top: 14px; }
+
+    /* ───────────────────────── Workspace ───────────────────────── */
+    .work { min-width: 0; }
+    .state { animation: rise .35s var(--ease); }
+    @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+    /* Empty */
+    .empty { padding: 48px 40px; }
+    .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+    .empty h1 { font-size: 32px; line-height: 1.15; letter-spacing: -.025em; margin: 10px 0 12px; max-width: 620px; font-weight: 700; }
+    .empty p.intro { color: var(--ink-2); font-size: 15px; max-width: 600px; margin: 0 0 32px; }
+    .features { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .feature { display: flex; gap: 14px; padding: 16px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--panel-2); }
+    .feature .ic { width: 36px; height: 36px; border-radius: 9px; display: grid; place-items: center; background: var(--panel); border: 1px solid var(--line); color: var(--accent); flex: none; }
+    .feature h3 { margin: 0 0 2px; font-size: 14px; font-weight: 650; }
+    .feature p { margin: 0; font-size: 13px; color: var(--ink-3); }
+    .flow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 28px; font-size: 13px; color: var(--ink-2); }
+    .flow span.step { display: inline-flex; align-items: center; gap: 8px; }
+    .flow b { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; background: var(--ink); color: var(--bg); }
+    .flow .sep { width: 24px; height: 1px; background: var(--line-2); }
+
+    /* Processing */
+    .proc { padding: 40px; max-width: 640px; }
+    .proc h2 { margin: 0 0 4px; font-size: 20px; letter-spacing: -.01em; }
+    .bar { height: 4px; background: var(--line); border-radius: 99px; overflow: hidden; margin: 22px 0 24px; }
+    .bar > i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 99px; transition: width .6s var(--ease); }
+    .steps { display: grid; gap: 4px; }
+    .st { display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 10px; color: var(--ink-3); }
+    .st .b { width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--line-2); display: grid; place-items: center; }
+    .st .t { font-weight: 600; }
+    .st .d { font-size: 12px; }
+    .st .s { font-size: 12px; }
+    .st.active { background: var(--panel-2); color: var(--ink); }
+    .st.active .b { border-color: var(--accent); border-top-color: transparent; animation: spin .8s linear infinite; }
+    .st.done { color: var(--ink-2); }
+    .st.done .b { background: var(--ok); border-color: var(--ok); color: #fff; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Reject */
+    .reject { padding: 36px; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: start; }
+    .reject .badge-ic { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--bad-soft); color: var(--bad); margin-bottom: 14px; }
+    .reject h2 { margin: 0 0 8px; font-size: 20px; }
+    .reject p { color: var(--ink-2); margin: 0 0 8px; }
+    .reject img { border-radius: var(--r-md); border: 1px solid var(--line); }
+
+    /* Results: summary */
+    .summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px; padding: 20px 22px; align-items: center; }
+    .sum-left { display: flex; gap: 16px; align-items: center; min-width: 0; }
+    .thumb { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; border: 1px solid var(--line); background: var(--panel-2); flex: none; }
+    .sum-type { font-size: 20px; font-weight: 700; letter-spacing: -.015em; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .tag { display: inline-flex; align-items: center; gap: 5px; height: 22px; padding: 0 8px; border-radius: 6px; font-size: 11px; font-weight: 600; letter-spacing: .02em; }
+    .tag.ok { background: var(--ok-soft); color: var(--ok); }
+    .tag.warn { background: var(--warn-soft); color: var(--warn); }
+    .sum-meta { font-size: 12px; color: var(--ink-3); margin-top: 3px; display: flex; gap: 14px; flex-wrap: wrap; }
+    .sum-right { display: flex; align-items: center; gap: 20px; }
+    .price-label { font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .08em; font-weight: 600; text-align: right; }
+    .price { font-size: 28px; font-weight: 750; letter-spacing: -.02em; text-align: right; line-height: 1.1; }
+    .sum-actions { display: flex; gap: 8px; }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 2px; margin: 18px 0 14px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab {
+      display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 14px; border: 0; background: none; cursor: pointer;
+      color: var(--ink-3); font-weight: 600; font-size: 13px; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
+    }
+    .tab:hover { color: var(--ink); }
+    .tab.on { color: var(--ink); border-bottom-color: var(--accent); }
+    .tabpane { display: none; }
+    .tabpane.on { display: block; animation: rise .3s var(--ease); }
+
+    /* 3D */
+    .viewer-card { overflow: hidden; }
+    .viewer-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+    .seg { display: inline-flex; padding: 3px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; }
+    .seg button { height: 28px; padding: 0 12px; border: 0; background: none; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 600; color: var(--ink-3); }
+    .seg button.on { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 0 0 1px var(--line); }
+    .toggle { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--ink-2); cursor: pointer; user-select: none; }
+    .toggle input { display: none; }
+    .sw { width: 30px; height: 18px; border-radius: 99px; background: var(--line-2); position: relative; transition: background .2s var(--ease); }
+    .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: transform .2s var(--ease); box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+    .toggle input:checked + .sw { background: var(--accent); }
+    .toggle input:checked + .sw::after { transform: translateX(12px); }
+    .viewer-bar .spacer { flex: 1; }
+    .viewer-wrap { position: relative; background: var(--viewer-bg); }
+    model-viewer::part(default-progress-bar) { display: none; }
+    model-viewer { width: 100%; height: 560px; display: block; background: transparent; --poster-color: transparent; }
+    .viewer-wrap:fullscreen model-viewer { height: 100vh; }
+    .viewer-hint { position: absolute; left: 14px; bottom: 12px; font-size: 11px; color: var(--ink-3); background: color-mix(in srgb, var(--panel) 80%, transparent); padding: 4px 8px; border-radius: 6px; pointer-events: none; }
+    .viewer-load { position: absolute; inset: 0; display: grid; place-items: center; color: var(--ink-3); font-size: 13px; pointer-events: none; }
+    .style-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink-3); }
+    .schip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink-2); font-weight: 500; text-transform: capitalize; }
+    .swatch { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); }
+    .dl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; margin-top: 14px; }
+    .dl {
+      display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--r-md);
+      background: var(--panel); text-decoration: none; color: var(--ink); transition: border-color .15s var(--ease), transform .15s var(--ease);
+    }
+    .dl:hover { border-color: var(--line-2); transform: translateY(-1px); }
+    .dl .ic { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink-2); flex: none; }
+    .dl.main .ic { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+    .dl b { display: block; font-size: 13px; }
+    .dl span { font-size: 11px; color: var(--ink-3); }
+
+    /* Cards & tables */
+    .grid-2 { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 16px; }
+    .card { padding: 20px; }
+    .card h3 { margin: 0 0 4px; font-size: 14px; font-weight: 650; }
+    .card .sub { font-size: 12px; color: var(--ink-3); margin: 0 0 16px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); padding: 0 10px 10px; border-bottom: 1px solid var(--line); }
+    td { padding: 11px 10px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+    tr:last-child td { border-bottom: 0; }
+    td.r, th.r { text-align: right; }
+    td.name { font-weight: 600; }
+    .rule { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--line); color: var(--ink-2); text-transform: capitalize; }
+    .stack { display: flex; height: 10px; border-radius: 99px; overflow: hidden; background: var(--line); margin: 6px 0 16px; }
+    .stack i { display: block; height: 100%; }
+    .brk { display: grid; gap: 2px; }
+    .brk-row { display: grid; grid-template-columns: 12px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; font-size: 13px; }
+    .brk-row .k { color: var(--ink-2); }
+    .brk-row .num { color: var(--ink); }
+    .brk-row .sw2 { width: 10px; height: 10px; border-radius: 3px; }
+    .brk-row.sub { border-top: 1px dashed var(--line-2); margin-top: 4px; padding-top: 12px; font-weight: 600; }
+    .brk-row.sub .k { color: var(--ink); }
+    .total { display: flex; justify-content: space-between; align-items: end; gap: 12px; margin-top: 12px; padding: 16px; border-radius: var(--r-md); background: var(--ink); color: var(--bg); font-size: 12px; }
+    .total small { display: block; opacity: .65; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+    .total b { font-size: 24px; letter-spacing: -.02em; }
+
+    .kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+    .kpi { padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--panel); }
+    .kpi .k { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--ink-2); }
+    .kpi .v { font-size: 22px; font-weight: 700; letter-spacing: -.02em; margin-top: 6px; }
+    .kpi .u { font-size: 12px; color: var(--ink-3); font-weight: 500; margin-left: 4px; }
+    .kpi .n { font-size: 11px; color: var(--ink-3); }
+    .kpi .sq { width: 10px; height: 10px; border-radius: 3px; }
+
+    .det-img { border-radius: var(--r-md); border: 1px solid var(--line); width: 100%; }
+    .meter { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; }
+    .meter i.low { background: var(--warn); }
+    .meter i { display: block; height: 100%; background: var(--ok); width: 0; transition: width .8s var(--ease); }
+    .kv { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: 13px; margin-top: 14px; }
+    .kv dt { color: var(--ink-3); }
+    .kv dd { margin: 0; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .comp { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+    .sheet-img { width: 100%; border-radius: var(--r-md); border: 1px solid var(--line); background: #fff; }
+    .code {
+      display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line);
+      font-family: var(--mono); font-size: 12px; margin: 14px 0;
+    }
+    .code span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    ol.howto { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 13px; }
+    ol.howto li { margin: 6px 0; }
+    kbd { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 5px; background: var(--panel); }
+
+    .toast {
+      position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); opacity: 0; z-index: 50;
+      background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 500;
+      transition: all .25s var(--ease); pointer-events: none;
+    }
+    .toast.show { transform: translate(-50%, 0); opacity: 1; }
+
+    /* Print: the customer quotation only */
+    #print-quote { display: none; }
+    @media print {
+      body { background: #fff; color: #111; }
+      .topbar, .app, .toast { display: none !important; }
+      #print-quote { display: block; padding: 8mm; font-size: 12px; }
+      #print-quote h1 { font-size: 22px; margin: 0; letter-spacing: .08em; }
+      #print-quote table td, #print-quote table th { border-color: #ddd; color: #111; padding: 6px 8px; }
+      #print-quote .pq-total { margin-top: 16px; padding: 12px; border: 2px solid #111; display: flex; justify-content: space-between; font-size: 16px; font-weight: 700; }
+    }
+
+    /* Responsive */
+    @media (max-width: 1080px) {
+      .app { grid-template-columns: minmax(0, 1fr); }
+      .side { position: static; max-height: none; }
+      .grid-2 { grid-template-columns: minmax(0, 1fr); }
+    }
+    @media (max-width: 640px) {
+      .app { padding: 16px; gap: 16px; }
+      .topbar { padding: 0 16px; }
+      .brand-sub, .pill.offline { display: none; }
+      .empty { padding: 28px 20px; }
+      .empty h1 { font-size: 24px; }
+      .features { grid-template-columns: 1fr; }
+      .summary { grid-template-columns: minmax(0, 1fr); }
+      .sum-right { flex-wrap: wrap; gap: 12px; }
+      .col-rule { display: none; }
+      td, th { padding-left: 6px; padding-right: 6px; }
+      .card { padding: 16px; }
+      .sum-right { justify-content: space-between; }
+      .price, .price-label { text-align: left; }
+      .reject { grid-template-columns: 1fr; padding: 24px; }
+      model-viewer { height: 400px; }
+      .proc { padding: 24px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SVG icon sprite -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-sofa" viewBox="0 0 24 24"><path d="M4 11V8a3 3 0 0 1 3-3h10a3 3 0 0 1 3 3v3"/><path d="M2 13a2 2 0 0 1 4 0v2h12v-2a2 2 0 0 1 4 0v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z"/><path d="M5 19v2M19 19v2"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="8" width="10" height="8" rx="1.5"/></symbol>
+    <symbol id="i-calc" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/></symbol>
+    <symbol id="i-cube" viewBox="0 0 24 24"><path d="M21 16V8l-9-5-9 5v8l9 5 9-5z"/><path d="M3.3 7.5L12 12l8.7-4.5M12 22V12"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 20h16"/></symbol>
+    <symbol id="i-print" viewBox="0 0 24 24"><path d="M6 9V3h12v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M6 14h12v7H6z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></symbol>
+    <symbol id="i-full" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3"/></symbol>
+    <symbol id="i-receipt" viewBox="0 0 24 24"><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><path d="M9 8h6M9 12h6"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></symbol>
+    <symbol id="i-ruler" viewBox="0 0 24 24"><path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1-1"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></symbol>
+  </svg>
+
+  <!-- ───────────────────────── Top bar ───────────────────────── -->
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Stallion home">
+      <span class="brand-mark"><svg class="i"><use href="#i-sofa"/></svg></span>
+      <span class="brand-name">STALLION</span>
+      <span class="brand-sub">Sofa Costing &amp; CAD</span>
+    </a>
+    <span class="spacer"></span>
+    <span class="pill offline" title="Detection, costing and CAD all run on this machine"><span class="dot"></span>On-device · no external APIs</span>
+    <button class="icon-btn" id="theme-btn" aria-label="Toggle light / dark theme"><svg class="i"><use href="#i-moon"/></svg></button>
+  </header>
+
+  <div class="app">
+
+    <!-- ───────────────────────── Input panel ───────────────────────── -->
+    <aside class="panel side" aria-label="New quote">
+      <div class="side-inner">
+        <h2>New quote</h2>
+        <p class="lead">Sofa photo and overall dimensions.</p>
+
+        <div class="field-label">Sofa photo</div>
+        <label class="drop" id="drop">
+          <input type="file" id="image-input" accept="image/jpeg,image/png,image/webp" aria-label="Upload sofa photo" />
+          <div class="drop-icon"><svg class="i"><use href="#i-upload"/></svg></div>
+          <div class="drop-title">Drop a photo or click to browse</div>
+          <div class="drop-sub">JPG, PNG or WEBP · front or ¾ view works best</div>
+        </label>
+        <div class="file hidden" id="file">
+          <img id="file-img" alt="" />
+          <div style="min-width:0">
+            <div class="file-name" id="file-name">—</div>
+            <div class="file-meta" id="file-meta">—</div>
+          </div>
+          <button class="icon-btn" id="file-remove" aria-label="Remove photo"><svg class="i sm"><use href="#i-x"/></svg></button>
+        </div>
+
+        <div class="field-label">Dimensions <span class="opt">mm</span></div>
+        <div class="presets" role="group" aria-label="Size presets">
+          <button class="chip" data-preset="850,850,850">1-seater</button>
+          <button class="chip" data-preset="1550,900,850">2-seater</button>
+          <button class="chip" data-preset="2100,900,850">3-seater</button>
+          <button class="chip" data-preset="2700,975,850" data-lshape="1">L-shape</button>
+        </div>
+        <div class="dims">
+          <div>
+            <div class="input" id="w-length"><input type="number" id="length-input" placeholder="2100" min="0" inputmode="numeric" aria-label="Length in mm" /></div>
+            <div class="input-cap">Length</div>
+          </div>
+          <div>
+            <div class="input" id="w-width"><input type="number" id="width-input" placeholder="900" min="0" inputmode="numeric" aria-label="Depth in mm" /></div>
+            <div class="input-cap">Depth</div>
+          </div>
+          <div>
+            <div class="input" id="w-height"><input type="number" id="height-input" placeholder="850" min="0" inputmode="numeric" aria-label="Height in mm" /></div>
+            <div class="input-cap">Height</div>
+          </div>
+        </div>
+        <div class="hint" id="dim-hint"></div>
+
+        <details class="more" id="lshape-opts">
+          <summary>L-shape options <svg class="i sm"><use href="#i-chev"/></svg></summary>
+          <div class="two">
+            <div>
+              <div class="input"><input type="number" id="chaise-input" placeholder="Auto" min="0" inputmode="numeric" aria-label="Chaise length in mm" /><span class="unit">mm</span></div>
+              <div class="input-cap">Chaise length</div>
+            </div>
+            <div>
+              <div class="input"><select id="chaise-side" aria-label="Chaise side"><option value="right">Right</option><option value="left">Left</option></select></div>
+              <div class="input-cap">Chaise side</div>
+            </div>
+          </div>
+          <div class="input-cap" style="margin-top:8px">Used only when the photo is detected as an L-shaped sofa.</div>
+        </details>
+
+        <div class="field-label">Customer <span class="opt">optional</span></div>
+        <div class="input"><input type="text" id="customer-input" placeholder="e.g. Rajesh Kumar" aria-label="Customer name" /></div>
+
+        <button class="btn primary block" id="submit-btn" disabled>
+          Generate quote &amp; CAD <svg class="i sm"><use href="#i-arrow"/></svg>
+        </button>
+        <div class="side-foot"><svg class="i sm"><use href="#i-shield"/></svg>Processed locally — nothing leaves this machine.</div>
+      </div>
+    </aside>
+
+    <!-- ───────────────────────── Workspace ───────────────────────── -->
+    <main class="work" id="work" aria-live="polite">
+
+      <!-- Empty -->
+      <section class="panel empty state" id="s-empty">
+        <div class="eyebrow">Sofa costing &amp; CAD</div>
+        <h1>From one photo to a costed quote and a manufacturable 3D model.</h1>
+        <p class="intro">Upload a customer's sofa photo and its overall size. Stallion identifies the sofa, scales every component of the bill of materials, prices it, and builds a CAD model with the complete internal structure.</p>
+        <div class="features">
+          <div class="feature"><div class="ic"><svg class="i"><use href="#i-scan"/></svg></div><div><h3>Detects the sofa</h3><p>Seat count, arms, cushions, legs and fabric colour from the photo.</p></div></div>
+          <div class="feature"><div class="ic"><svg class="i"><use href="#i-calc"/></svg></div><div><h3>Prices every component</h3><p>Scaled BOM with materials, labour, overhead and margin.</p></div></div>
+          <div class="feature"><div class="ic"><svg class="i"><use href="#i-cube"/></svg></div><div><h3>Builds the 3D CAD</h3><p>Frame, springs, belts, foam and fabric — STEP for Fusion 360.</p></div></div>
+          <div class="feature"><div class="ic"><svg class="i"><use href="#i-shield"/></svg></div><div><h3>Runs fully offline</h3><p>No external APIs. Models and data stay on this machine.</p></div></div>
+        </div>
+        <div class="flow">
+          <span class="step"><b>1</b>Upload photo</span><span class="sep"></span>
+          <span class="step"><b>2</b>Enter dimensions</span><span class="sep"></span>
+          <span class="step"><b>3</b>Review quote &amp; 3D model</span>
+        </div>
+      </section>
+
+      <!-- Processing -->
+      <section class="panel proc state hidden" id="s-proc">
+        <h2>Building your quote</h2>
+        <div class="muted">Usually 10–25 seconds.</div>
+        <div class="bar"><i id="proc-bar"></i></div>
+        <div class="steps" id="steps"></div>
+      </section>
+
+      <!-- Rejected / error -->
+      <section class="panel reject state hidden" id="s-reject">
+        <div>
+          <div class="badge-ic"><svg class="i"><use href="#i-alert"/></svg></div>
+          <h2 id="rej-title">Sofa not recognised</h2>
+          <p id="rej-reason"></p>
+          <p class="muted" id="rej-detail" style="font-size:13px"></p>
+          <button class="btn" id="retry-btn" style="margin-top:12px"><svg class="i sm"><use href="#i-reset"/></svg>Try another photo</button>
+        </div>
+        <div><img id="rej-img" class="hidden" alt="Detection result" /></div>
+      </section>
+
+      <!-- Results -->
+      <section class="state hidden" id="s-result">
+        <div class="panel summary">
+          <div class="sum-left">
+            <img class="thumb" id="r-thumb" alt="" />
+            <div style="min-width:0">
+              <div class="sum-type"><span id="r-type">—</span><span class="tag ok" id="r-conf">—</span></div>
+              <div class="sum-meta">
+                <span id="r-dims">—</span><span id="r-cust">—</span><span id="r-id" class="num">—</span>
+              </div>
+            </div>
+          </div>
+          <div class="sum-right">
+            <div>
+              <div class="price-label">Quotation</div>
+              <div class="price num" id="r-price">₹—</div>
+            </div>
+            <div class="sum-actions">
+              <button class="btn sm" id="print-btn" title="Print customer quotation"><svg class="i sm"><use href="#i-print"/></svg>Print</button>
+              <button class="btn sm primary" id="new-btn"><svg class="i sm"><use href="#i-plus"/></svg>New</button>
+            </div>
+          </div>
+        </div>
+
+        <nav class="tabs" role="tablist">
+          <button class="tab on" data-tab="model" role="tab"><svg class="i sm"><use href="#i-cube"/></svg>3D model</button>
+          <button class="tab" data-tab="quote" role="tab"><svg class="i sm"><use href="#i-receipt"/></svg>Quotation</button>
+          <button class="tab" data-tab="materials" role="tab"><svg class="i sm"><use href="#i-layers"/></svg>Materials</button>
+          <button class="tab" data-tab="detect" role="tab"><svg class="i sm"><use href="#i-scan"/></svg>Detection</button>
+          <button class="tab" data-tab="drawing" role="tab"><svg class="i sm"><use href="#i-ruler"/></svg>2D drawing</button>
+          <button class="tab" data-tab="fusion" role="tab"><svg class="i sm"><use href="#i-link"/></svg>Fusion 360</button>
+        </nav>
+
+        <!-- 3D -->
+        <div class="tabpane on" id="t-model">
+          <div class="panel viewer-card">
+            <div class="viewer-bar">
+              <div class="seg" id="view-seg">
+                <button class="on" data-view="assembled">Assembled</button>
+                <button data-view="exploded">Exploded</button>
+              </div>
+              <label class="toggle"><input type="checkbox" id="show-fabric" checked /><span class="sw"></span>Fabric</label>
+              <label class="toggle"><input type="checkbox" id="show-foam" checked /><span class="sw"></span>Foam</label>
+              <span class="spacer"></span>
+              <button class="icon-btn" id="reset-view" title="Reset view" aria-label="Reset view"><svg class="i sm"><use href="#i-reset"/></svg></button>
+              <button class="icon-btn" id="full-view" title="Full screen" aria-label="Full screen"><svg class="i sm"><use href="#i-full"/></svg></button>
+            </div>
+            <div class="viewer-wrap" id="viewer-wrap">
+              <model-viewer id="viewer" camera-controls auto-rotate auto-rotate-delay="5000" rotation-per-second="10deg"
+                            shadow-intensity="0.9" shadow-softness="0.8" exposure="1.05" interaction-prompt="none"
+                            camera-orbit="-35deg 72deg auto" alt="3D sofa model with internal components"></model-viewer>
+              <div class="viewer-load" id="viewer-load">Loading model…</div>
+              <div class="viewer-hint">Drag to rotate · scroll to zoom · turn off Fabric and Foam to see the structure</div>
+            </div>
+            <div class="style-row" id="style-row"></div>
+          </div>
+          <div class="dl-grid" id="downloads"></div>
+        </div>
+
+        <!-- Quotation -->
+        <div class="tabpane" id="t-quote">
+          <div class="grid-2">
+            <div class="panel card">
+              <h3>Bill of materials</h3>
+              <p class="sub">Quantities scaled from the master template to the requested size.</p>
+              <div style="overflow-x:auto">
+                <table>
+                  <thead><tr><th>Component</th><th class="col-rule">Scaling</th><th class="r">Qty</th><th class="r">Rate</th><th class="r">Amount</th></tr></thead>
+                  <tbody id="bom-body"></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="panel card">
+              <h3>Cost breakdown</h3>
+              <p class="sub">How the quotation price is built up.</p>
+              <div class="stack" id="stack"></div>
+              <div class="brk" id="brk"></div>
+              <div class="total"><div><small>Final quotation</small>Inclusive of overhead &amp; margin</div><b class="num" id="q-final">₹—</b></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Materials -->
+        <div class="tabpane" id="t-materials">
+          <div class="panel card">
+            <h3>Material take-off from the 3D model</h3>
+            <p class="sub">Measured directly from the generated solids — volumes, sheet areas, counts and running lengths.</p>
+            <div class="kpis" id="kpis"></div>
+          </div>
+        </div>
+
+        <!-- Detection -->
+        <div class="tabpane" id="t-detect">
+          <div class="grid-2">
+            <div class="panel card">
+              <h3>Detection</h3>
+              <p class="sub">Segmentation from the on-device Stallion YOLO model.</p>
+              <img class="det-img" id="det-img" alt="Annotated detection" />
+            </div>
+            <div class="panel card">
+              <h3>Result</h3>
+              <p class="sub" id="det-type">—</p>
+              <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink-3);margin-bottom:6px"><span>Confidence</span><span id="det-conf" class="num">—</span></div>
+              <div class="meter"><i id="det-meter"></i></div>
+              <div class="field-label" style="margin-top:20px">Components found</div>
+              <div class="comp" id="det-comp"></div>
+              <dl class="kv" id="det-kv"></dl>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2D drawing -->
+        <div class="tabpane" id="t-drawing">
+          <div class="panel card">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+              <div><h3>Technical drawing</h3><div class="sub" style="margin:0">Top, front and side views with internal components.</div></div>
+              <a class="btn sm" id="dxf-btn" download><svg class="i sm"><use href="#i-download"/></svg>DXF</a>
+            </div>
+            <img class="sheet-img" id="sheet-img" alt="2D technical drawing" />
+            <div class="muted hidden" id="sheet-none">No drawing was generated for this request.</div>
+          </div>
+        </div>
+
+        <!-- Fusion -->
+        <div class="tabpane" id="t-fusion">
+          <div class="grid-2">
+            <div class="panel card">
+              <h3>Open the CAD model in Fusion 360</h3>
+              <p class="sub">The STEP file is a full assembly — one component per material group, named and coloured.</p>
+              <ol class="howto">
+                <li>Download the <b>STEP</b> file.</li>
+                <li>In Fusion 360: <b>File → Open → Open from my computer</b>, select the file.</li>
+                <li>Components (Wood Frame, Springs, Fabric…) appear in the browser tree.</li>
+              </ol>
+              <a class="btn sm accent" id="fusion-step" style="margin-top:14px" download><svg class="i sm"><use href="#i-download"/></svg>Download STEP</a>
+            </div>
+            <div class="panel card">
+              <h3>StallionLink parameters</h3>
+              <p class="sub">Drive your own parametric Fusion model with the <kbd>StallionLink</kbd> script.</p>
+              <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+                <div class="kpi"><div class="k">Length</div><div class="v num" id="fp-l">—</div></div>
+                <div class="kpi"><div class="k">Depth</div><div class="v num" id="fp-w">—</div></div>
+                <div class="kpi"><div class="k">Height</div><div class="v num" id="fp-h">—</div></div>
+              </div>
+              <div class="code"><span id="fp-path">—</span><button class="icon-btn" id="fp-copy" aria-label="Copy path"><svg class="i sm"><use href="#i-copy"/></svg></button></div>
+              <ol class="howto">
+                <li>In Fusion 360 press <kbd>Shift</kbd> + <kbd>S</kbd>, choose <b>StallionLink</b>, click <b>Run</b>.</li>
+                <li>Select the JSON file above — Length, Width and Height parameters update.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Printable quotation (print only) -->
+  <div id="print-quote"></div>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script>
+  (function () {
+    const $ = (id) => document.getElementById(id);
+    const inr = (n) => (n === undefined || n === null || isNaN(n)) ? '—'
+      : '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    const inr2 = (n) => (n === undefined || n === null || isNaN(n)) ? '—'
+      : '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const TYPE = {
+      '1_seater': '1-Seater', '2_seater': '2-Seater', '3_seater': '3-Seater',
+      '4_seater_plus': '4-Seater+', 'l_shape': 'L-Shape Sectional',
+    };
+    const GROUP_COLOR = {
+      'Wood Frame': '#d6a86c', 'Plywood': '#b07c48', 'Handle Frame': '#c49254', 'Springs': '#a0a6ac',
+      'Clips': '#c9c9d0', 'Seat Belts': '#28282c', 'Back Rest Belts': '#3e3e46', 'Foam': '#e688a8',
+      'Handle Foam': '#f0aa78', 'Fabric': '#5e733e', 'Legs': '#3c2819',
+    };
+
+    function toast(msg) {
+      const t = $('toast'); t.textContent = msg; t.classList.add('show');
+      clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2200);
+    }
+
+    // ── Theme ────────────────────────────────────────────────
+    const themeBtn = $('theme-btn');
+    function paintThemeIcon() {
+      const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+      themeBtn.innerHTML = `<svg class="i"><use href="#i-${dark ? 'sun' : 'moon'}"/></svg>`;
+    }
+    themeBtn.addEventListener('click', () => {
+      const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('stallion-theme', next); } catch (e) {}
+      paintThemeIcon();
+    });
+    paintThemeIcon();
+
+    // ── States ───────────────────────────────────────────────
+    const STATES = ['s-empty', 's-proc', 's-reject', 's-result'];
+    function show(id) { STATES.forEach((s) => $(s).classList.toggle('hidden', s !== id)); }
+
+    // ── Photo ────────────────────────────────────────────────
+    let file = null, fileUrl = null;
+    const drop = $('drop'), input = $('image-input');
+    ['dragenter', 'dragover'].forEach((e) => drop.addEventListener(e, (ev) => { ev.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach((e) => drop.addEventListener(e, () => drop.classList.remove('over')));
+    drop.addEventListener('drop', (ev) => { ev.preventDefault(); if (ev.dataTransfer.files[0]) setFile(ev.dataTransfer.files[0]); });
+    input.addEventListener('change', () => { if (input.files[0]) setFile(input.files[0]); });
+    function setFile(f) {
+      if (!/^image\/(jpeg|png|webp)$/.test(f.type)) { toast('Please choose a JPG, PNG or WEBP image'); return; }
+      file = f;
+      if (fileUrl) URL.revokeObjectURL(fileUrl);
+      fileUrl = URL.createObjectURL(f);
+      $('file-img').src = fileUrl;
+      $('file-name').textContent = f.name;
+      $('file-meta').textContent = bytes(f.size) + ' · ' + (f.type.split('/')[1] || '').toUpperCase();
+      drop.classList.add('hidden'); $('file').classList.remove('hidden');
+      validate();
+    }
+    function clearFile() {
+      file = null; input.value = '';
+      drop.classList.remove('hidden'); $('file').classList.add('hidden');
+      validate();
+    }
+    $('file-remove').addEventListener('click', clearFile);
+    function bytes(b) { return b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(1) + ' MB'; }
+
+    // ── Dimensions ───────────────────────────────────────────
+    const L = $('length-input'), W = $('width-input'), H = $('height-input');
+    const RANGE = { length: [700, 3200], width: [700, 1200], height: [650, 1100] };   // master template envelope
+    document.querySelectorAll('[data-preset]').forEach((b) => b.addEventListener('click', () => {
+      const [l, w, h] = b.dataset.preset.split(',');
+      L.value = l; W.value = w; H.value = h;
+      document.querySelectorAll('[data-preset]').forEach((x) => x.classList.toggle('on', x === b));
+      if (b.dataset.lshape) $('lshape-opts').open = true;
+      validate();
+    }));
+    [L, W, H].forEach((i) => i.addEventListener('input', () => {
+      document.querySelectorAll('[data-preset]').forEach((x) => x.classList.remove('on'));
+      validate();
+    }));
+    function validate() {
+      const warns = [];
+      [['length', L], ['width', W], ['height', H]].forEach(([k, el]) => {
+        const v = parseFloat(el.value), [lo, hi] = RANGE[k];
+        const bad = el.value && (v < lo || v > hi);
+        $('w-' + k).classList.toggle('warn', !!bad);
+        if (bad) warns.push(`${k === 'width' ? 'depth' : k} is outside the usual ${lo}–${hi} mm`);
+      });
+      $('dim-hint').textContent = warns.length ? 'Note: ' + warns.join('; ') + '.' : '';
+      $('dim-hint').classList.toggle('show', warns.length > 0);
+      $('submit-btn').disabled = busy || !(file && L.value > 0 && W.value > 0 && H.value > 0);
+    }
+
+    // ── Progress ─────────────────────────────────────────────
+    const STEPS = [
+      ['Uploading photo', 'Sending the image to the local server', 400],
+      ['Detecting the sofa', 'Segmenting arms, cushions, legs and base', 3500],
+      ['Scaling bill of materials', 'Applying size factors to every component', 2000],
+      ['Pricing', 'Materials, labour, overhead and margin', 1200],
+      ['Building 3D CAD', 'Frame, springs, belts, foam and fabric', 6000],
+      ['Exporting files', 'STEP, GLB, STL and material take-off', 4000],
+    ];
+    let timers = [], busy = false;
+    function startProgress() {
+      $('steps').innerHTML = STEPS.map(([t, d], i) =>
+        `<div class="st" id="st-${i}"><span class="b"></span><div><div class="t">${t}</div><div class="d">${d}</div></div><span class="s">Waiting</span></div>`).join('');
+      $('proc-bar').style.width = '0';
+      let at = 0;
+      const total = STEPS.reduce((a, s) => a + s[2], 0);
+      STEPS.forEach((s, i) => {
+        const startAt = at;
+        timers.push(setTimeout(() => {
+          if (i > 0) markDone(i - 1);
+          const el = $('st-' + i); el.classList.add('active'); el.querySelector('.s').textContent = 'Running';
+          $('proc-bar').style.width = Math.min(92, ((startAt + s[2] * 0.5) / total) * 100) + '%';
+        }, startAt));
+        at += s[2];
+      });
+    }
+    function markDone(i) {
+      const el = $('st-' + i); if (!el) return;
+      el.classList.remove('active'); el.classList.add('done');
+      el.querySelector('.b').innerHTML = '<svg class="i sm" style="width:13px;height:13px;stroke-width:2.5"><use href="#i-check"/></svg>';
+      el.querySelector('.s').textContent = 'Done';
+    }
+    function stopProgress() {
+      timers.forEach(clearTimeout); timers = [];
+      STEPS.forEach((_, i) => markDone(i));
+      $('proc-bar').style.width = '100%';
+    }
+
+    // ── Submit ───────────────────────────────────────────────
+    $('submit-btn').addEventListener('click', async () => {
+      if (!file || busy) return;
+      const fd = new FormData();
+      fd.append('image', file);
+      fd.append('customer_name', $('customer-input').value.trim() || 'Guest');
+      fd.append('length_mm', L.value); fd.append('width_mm', W.value); fd.append('height_mm', H.value);
+      const cl = $('chaise-input').value;
+      if (cl > 0) fd.append('chaise_length_mm', cl);
+      fd.append('chaise_side', $('chaise-side').value);
+
+      busy = true; validate();
+      show('s-proc'); startProgress();
+      try {
+        const resp = await fetch('/api/quote', { method: 'POST', body: fd });
+        const data = await resp.json();
+        stopProgress();
+        if (data.status === 'success') { renderResult(data); show('s-result'); selectTab('model'); }
+        else renderReject(data);
+      } catch (err) {
+        stopProgress();
+        renderReject({ reason: 'Could not reach the local server: ' + err.message });
+      } finally {
+        busy = false; validate();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    });
+
+    function reset() {
+      clearFile();
+      [L, W, H, $('customer-input'), $('chaise-input')].forEach((i) => (i.value = ''));
+      document.querySelectorAll('[data-preset]').forEach((x) => x.classList.remove('on'));
+      validate(); show('s-empty');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    $('new-btn').addEventListener('click', reset);
+    $('retry-btn').addEventListener('click', () => { show('s-empty'); clearFile(); input.click(); });
+
+    // ── Reject ───────────────────────────────────────────────
+    function renderReject(data) {
+      const sa = data.sofa_analysis || {};
+      $('rej-title').textContent = data.status === 'rejected'
+        ? (sa.detected_object ? 'Sofa type not supported' : 'No sofa detected') : 'Something went wrong';
+      $('rej-reason').textContent = data.reason || 'Unknown error.';
+      $('rej-detail').textContent = sa.predicted_type
+        ? `Detected ${TYPE[sa.predicted_type] || sa.predicted_type} at ${Math.round((sa.confidence || 0) * 100)}% confidence.` : '';
+      const img = $('rej-img');
+      if (data.annotated_image_url) { img.src = data.annotated_image_url; img.classList.remove('hidden'); }
+      else img.classList.add('hidden');
+      show('s-reject');
+    }
+
+    // ── Tabs ─────────────────────────────────────────────────
+    function selectTab(name) {
+      document.querySelectorAll('.tab').forEach((t) => {
+        const on = t.dataset.tab === name;
+        t.classList.toggle('on', on); t.setAttribute('aria-selected', on);
+      });
+      document.querySelectorAll('.tabpane').forEach((p) => p.classList.toggle('on', p.id === 't-' + name));
+    }
+    document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => selectTab(t.dataset.tab)));
+
+    // ── Results ──────────────────────────────────────────────
+    function renderResult(d) {
+      const sa = d.sofa_analysis || {}, dims = d.dimensions_mm || {}, q = d.quote || {};
+      const conf = Math.round((sa.confidence || 0) * 100);
+      $('r-thumb').src = fileUrl || d.annotated_image_url || '';
+      $('r-type').textContent = TYPE[sa.predicted_type] || sa.predicted_type || 'Sofa';
+      const tag = $('r-conf');
+      tag.textContent = conf + '% match'; tag.className = 'tag ' + (conf >= 50 ? 'ok' : 'warn');
+      $('r-dims').textContent = `${dims.length} × ${dims.width} × ${dims.height} mm`;
+      $('r-cust').textContent = d.customer_name || 'Guest';
+      $('r-id').textContent = d.request_id;
+      $('r-price').textContent = inr(q.final_quotation_price);
+
+      renderModel(d);
+      renderQuote(d);
+      renderMaterials(d);
+      renderDetection(d);
+      renderDrawing(d);
+      renderFusion(d);
+      renderPrint(d);
+    }
+
+    // 3D
+    const viewer = $('viewer');
+    let urls = {};
+    function applyLayers() {
+      if (!viewer.model) return;
+      const fab = $('show-fabric').checked, foam = $('show-foam').checked;
+      for (const m of viewer.model.materials) {
+        const n = m.name || '';
+        const hide = (n.startsWith('Fabric') && !fab) || ((n.startsWith('Foam') || n.startsWith('Handle_Foam')) && !foam);
+        const c = m.pbrMetallicRoughness.baseColorFactor;
+        m.setAlphaMode(hide ? 'BLEND' : 'OPAQUE');
+        m.pbrMetallicRoughness.setBaseColorFactor([c[0], c[1], c[2], hide ? 0 : 1]);
+      }
+    }
+    viewer.addEventListener('load', () => { $('viewer-load').classList.add('hidden'); applyLayers(); });
+    viewer.addEventListener('error', () => { $('viewer-load').textContent = 'The 3D model could not be loaded.'; });
+    $('show-fabric').addEventListener('change', applyLayers);
+    $('show-foam').addEventListener('change', applyLayers);
+    document.querySelectorAll('#view-seg button').forEach((b) => b.addEventListener('click', () => {
+      document.querySelectorAll('#view-seg button').forEach((x) => x.classList.toggle('on', x === b));
+      const src = b.dataset.view === 'exploded' ? urls.glb_exploded : urls.glb;
+      if (src && viewer.src !== new URL(src, location.href).href) { $('viewer-load').classList.remove('hidden'); viewer.src = src; }
+    }));
+    $('reset-view').addEventListener('click', () => {
+      viewer.cameraOrbit = '-35deg 72deg auto'; viewer.cameraTarget = 'auto auto auto'; viewer.fieldOfView = 'auto';
+      if (viewer.jumpCameraToGoal) viewer.jumpCameraToGoal();
+    });
+    $('full-view').addEventListener('click', () => {
+      const w = $('viewer-wrap');
+      if (document.fullscreenElement) document.exitFullscreen(); else if (w.requestFullscreen) w.requestFullscreen();
+    });
+
+    function renderModel(d) {
+      urls = d.model_urls || {};
+      document.querySelectorAll('#view-seg button').forEach((x) => x.classList.toggle('on', x.dataset.view === 'assembled'));
+      $('show-fabric').checked = true; $('show-foam').checked = true;
+      if (urls.glb) {
+        $('viewer-load').textContent = 'Loading model…'; $('viewer-load').classList.remove('hidden');
+        viewer.src = urls.glb;
+      } else {
+        viewer.removeAttribute('src');
+        $('viewer-load').textContent = d.model_error ? '3D model unavailable: ' + d.model_error : '3D model unavailable.';
+        $('viewer-load').classList.remove('hidden');
+      }
+      const st = d.model_style;
+      const rgb = (a) => `rgb(${(a || [128, 128, 128]).join(',')})`;
+      $('style-row').innerHTML = st ? ['<span>Built from the photo</span>',
+        `<span class="schip"><span class="swatch" style="background:${rgb(st.fabric_rgb)}"></span>Fabric</span>`,
+        `<span class="schip">${st.arms === 'none' ? 'Armless' : esc(st.arm_style) + ' arms'}</span>`,
+        `<span class="schip">${st.seat_cushions ? st.seat_cushions + ' seat cushion' + (st.seat_cushions > 1 ? 's' : '') : 'Tight seat'}</span>`,
+        `<span class="schip">${st.back_cushions ? st.back_cushions + ' back cushion' + (st.back_cushions > 1 ? 's' : '') : 'Tight back'}</span>`,
+        `<span class="schip"><span class="swatch" style="background:${rgb(st.leg_rgb)}"></span>${st.leg_style === 'tapered' ? 'Wooden legs' : 'Block legs'}</span>`,
+        st.l_shape ? `<span class="schip">Chaise ${esc(st.chaise_side)} · ${Math.round(st.chaise_depth_mm)} mm</span>` : '',
+      ].join('') : '';
+
+      const items = [
+        ['step', 'STEP assembly', 'Fusion 360 · SolidWorks · FreeCAD', 'i-cube', true],
+        ['glb', 'GLB model', 'Web · AR · Blender', 'i-cube'],
+        ['stl', 'STL mesh', 'Manufacturing · 3D print', 'i-file'],
+        ['takeoff_csv', 'Parts take-off', 'Every part · CSV', 'i-layers'],
+      ].filter((x) => urls[x[0]]).map(([k, t, s, ic, main]) =>
+        `<a class="dl${main ? ' main' : ''}" href="${urls[k]}" download><span class="ic"><svg class="i sm"><use href="#${ic}"/></svg></span><div><b>${t}</b><span>${s}</span></div></a>`);
+      if (d.cad_dxf_url) items.push(`<a class="dl" href="${d.cad_dxf_url}" download><span class="ic"><svg class="i sm"><use href="#i-ruler"/></svg></span><div><b>2D drawing</b><span>DXF · AutoCAD</span></div></a>`);
+      $('downloads').innerHTML = items.join('');
+    }
+
+    // Quotation
+    function renderQuote(d) {
+      const q = d.quote || {};
+      $('bom-body').innerHTML = (d.bom || []).map((r) => `
+        <tr><td class="name">${esc(r.component)}</td><td class="col-rule"><span class="rule">${esc(r.scaling_rule)}</span></td>
+        <td class="r">${Number(r.qty).toLocaleString('en-IN', { maximumFractionDigits: 3 })}</td>
+        <td class="r">${inr2(r.unit_cost)}</td><td class="r"><b>${inr2(r.total_cost)}</b></td></tr>`).join('');
+      const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
+      const parts = [
+        ['Materials', q.material_cost, 'var(--accent)'],
+        ['Labour', q.labor_cost, '#6b8fb3'],
+        ['Finishing', q.finishing_cost, '#8aa57a'],
+        [`Overhead (${pct(q.overhead, q.subtotal)}%)`, q.overhead, '#b6a06a'],
+        [`Margin (${pct(q.profit, q.cost_after_overhead)}%)`, q.profit, '#8e7fb0'],
+      ];
+      const total = q.final_quotation_price || 1;
+      $('stack').innerHTML = parts.map(([k, v, c]) => `<i title="${esc(k)}" style="width:${((v || 0) / total) * 100}%;background:${c}"></i>`).join('');
+      const row = ([k, v, c], sub) => `<div class="brk-row${sub ? ' sub' : ''}"><span class="sw2" style="background:${c || 'transparent'}"></span><span class="k">${k}</span><span class="num">${inr2(v)}</span></div>`;
+      $('brk').innerHTML = row(parts[0]) + row(parts[1]) + row(parts[2]) + row(['Subtotal', q.subtotal], true)
+        + row(parts[3]) + row(['Cost after overhead', q.cost_after_overhead], true) + row(parts[4]);
+      $('q-final').textContent = inr2(q.final_quotation_price);
+    }
+
+    // Materials
+    function renderMaterials(d) {
+      const t = d.model_takeoff || [];
+      $('kpis').innerHTML = t.length ? t.map((g) => `
+        <div class="kpi"><div class="k"><span class="sq" style="background:${GROUP_COLOR[g.group] || '#888'}"></span>${esc(g.group)}</div>
+        <div class="v num">${Number(g.qty).toLocaleString('en-IN', { maximumFractionDigits: 3 })}<span class="u">${esc(g.unit)}</span></div>
+        <div class="n">${g.pieces} part${g.pieces === 1 ? '' : 's'}${g.wire_length_m ? ' · ' + g.wire_length_m + ' m wire' : ''}${g.running_length_m ? ' · ' + g.running_length_m + ' m' : ''}</div></div>`).join('')
+        : '<div class="muted">No take-off available.</div>';
+    }
+
+    // Detection
+    function renderDetection(d) {
+      const sa = d.sofa_analysis || {}, m = d.image_metadata || {};
+      const conf = Math.round((sa.confidence || 0) * 100);
+      $('det-img').src = d.annotated_image_url || fileUrl || '';
+      $('det-type').textContent = (TYPE[sa.predicted_type] || sa.predicted_type || '—') + ' detected';
+      $('det-conf').textContent = conf + '%';
+      $('det-meter').style.width = '0';
+      $('det-meter').classList.toggle('low', conf < 50);
+      setTimeout(() => ($('det-meter').style.width = conf + '%'), 60);
+      const cc = sa.component_counts || {};
+      $('det-comp').innerHTML = Object.keys(cc).length
+        ? Object.entries(cc).map(([k, v]) => `<span class="schip">${esc(k.replace('_', ' '))}<b style="margin-left:2px">${v}</b></span>`).join('')
+        : '<span class="muted">No components segmented.</span>';
+      const kv = [
+        ['Image', `${m.original_width || '—'} × ${m.original_height || '—'} px`],
+        ['Format', m.format || '—'],
+        ['Segmentation', sa.segmentation_available ? 'Available' : 'Not available'],
+        ['Model', sa.detector_backend || '—'],
+      ];
+      $('det-kv').innerHTML = kv.map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('');
+    }
+
+    // Drawing
+    function renderDrawing(d) {
+      const has = !!d.cad_preview_url;
+      $('sheet-img').classList.toggle('hidden', !has);
+      $('sheet-none').classList.toggle('hidden', has);
+      if (has) $('sheet-img').src = d.cad_preview_url;
+      const dxf = $('dxf-btn');
+      dxf.classList.toggle('hidden', !d.cad_dxf_url);
+      if (d.cad_dxf_url) dxf.href = d.cad_dxf_url;
+    }
+
+    // Fusion
+    function renderFusion(d) {
+      const dims = d.dimensions_mm || {};
+      $('fp-l').textContent = dims.length ?? '—'; $('fp-w').textContent = dims.width ?? '—'; $('fp-h').textContent = dims.height ?? '—';
+      const path = `outputs/requests/${d.request_id}/input_request.json`;
+      $('fp-path').textContent = path; $('fp-path').title = path;
+      const step = $('fusion-step'), su = (d.model_urls || {}).step;
+      step.classList.toggle('hidden', !su);
+      if (su) step.href = su;
+    }
+    $('fp-copy').addEventListener('click', () => {
+      const text = $('fp-path').textContent;
+      (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(
+        () => toast('Path copied'), () => toast(text));
+    });
+
+    // Print
+    function renderPrint(d) {
+      const q = d.quote || {}, dims = d.dimensions_mm || {}, sa = d.sofa_analysis || {};
+      const date = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+      $('print-quote').innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:14px">
+          <div><h1>STALLION</h1><div>Sofa quotation</div></div>
+          <div style="text-align:right">${esc(date)}<br/>Ref ${esc(d.request_id)}</div>
+        </div>
+        <p><b>Customer:</b> ${esc(d.customer_name || 'Guest')}<br/>
+           <b>Sofa:</b> ${esc(TYPE[sa.predicted_type] || sa.predicted_type || '')} — ${dims.length} × ${dims.width} × ${dims.height} mm</p>
+        <table style="width:100%;border-collapse:collapse"><thead><tr><th style="text-align:left">Component</th><th style="text-align:right">Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr></thead>
+        <tbody>${(d.bom || []).map((r) => `<tr><td>${esc(r.component)}</td><td style="text-align:right">${r.qty}</td><td style="text-align:right">${inr2(r.unit_cost)}</td><td style="text-align:right">${inr2(r.total_cost)}</td></tr>`).join('')}</tbody></table>
+        <table style="margin-top:12px;width:50%;margin-left:auto;border-collapse:collapse">
+          <tr><td>Materials</td><td style="text-align:right">${inr2(q.material_cost)}</td></tr>
+          <tr><td>Labour</td><td style="text-align:right">${inr2(q.labor_cost)}</td></tr>
+          <tr><td>Finishing</td><td style="text-align:right">${inr2(q.finishing_cost)}</td></tr>
+          <tr><td>Overhead</td><td style="text-align:right">${inr2(q.overhead)}</td></tr>
+          <tr><td>Margin</td><td style="text-align:right">${inr2(q.profit)}</td></tr>
+        </table>
+        <div class="pq-total"><span>Total</span><span>${inr2(q.final_quotation_price)}</span></div>`;
+    }
+    $('print-btn').addEventListener('click', () => window.print());
+
+    validate();
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+{
+  "dataset": "stallion_sofa_master_yolov8_segmentation",
+  "status": "PASS",
+  "seed": 42,
+  "final_classes": {
+    "0": "back_cushion",
+    "1": "base",
+    "2": "left_arm",
+    "3": "legs",
+    "4": "right_arm",
+    "5": "seat_cushion",
+    "6": "stallion-sofa"
+  },
+  "image_counts": {
+    "train": 116,
+    "valid": 42
+  },
+  "total_images": 158,
+  "source_retained_counts": {
+    "sofa_v3": 64,
+    "sofa_v2_old": 58,
+    "sofa_v2_component": 36
+  },
+  "total_objects": 1337,
+  "class_object_counts": {
+    "back_cushion": 186,
+    "base": 81,
+    "left_arm": 183,
+    "legs": 385,
+    "right_arm": 164,
+    "seat_cushion": 169,
+    "stallion-sofa": 169
+  },
+  "duplicate_source_ids_removed": [
+    "1125872255",
+    "1152435090",
+    "1306540130",
+    "157690198",
+    "503685150",
+    "875579118",
+    "996970902"
+  ],
+  "duplicate_images_removed": 7,
+  "exact_duplicate_groups_after_merge": 0,
+  "bbox_annotations_converted_to_rectangular_polygons": 7,
+  "validation_errors": [],
+  "notes": [
+    "No test split was fabricated.",
+    "The seven cross-dataset duplicate source images between sofa_v3 and sofa_v2_component were deduplicated to prevent train/validation leakage.",
+    "All three source class vocabularies were normalized to the seven-class master vocabulary.",
+    "The old six-class dataset was remapped so its class IDs match the master vocabulary.",
+    "Seven YOLO bounding-box annotations were converted to rectangular segmentation polygons because the merged dataset is kept in YOLO segmentation format."
+  ],
+  "structural_validation_errors": []
+}

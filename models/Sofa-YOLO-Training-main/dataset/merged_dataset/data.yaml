@@ -1,0 +1,5 @@
+train: train/images
+val: valid/images
+
+nc: 11
+names: ['back_cushion', 'base', 'left_arm', 'legs', 'right_arm', 'seat_cushion', 'one-seater', 'stallion-sofa1', 'stallion-sofa2', 'stallion-sofa', 'two-seater']

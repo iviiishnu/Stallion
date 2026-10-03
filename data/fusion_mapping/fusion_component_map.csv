@@ -1,0 +1,11 @@
+fusion_component_name,component_group,scale_mode,cost_group,notes
+Wood Frame,Wood Frame,3D Volume,Wood Frame,Structural wood frame bodies grouped from Fusion master model
+Plywood,Plywood,Area,Plywood,Plywood/support panel bodies grouped from Fusion master model
+Foam,Foam,Area/Volume,Foam,Main seat and back foam grouped from Fusion master model
+Handle Foam,Handle Foam,Area/Volume,Handle Foam,Arm foam grouped from Fusion master model
+Fabric,Fabric,Surface Area,Fabric,Outer fabric/upholstery grouped from Fusion master model
+Springs,Springs,Count by Length,Springs,Seat spring bodies grouped from Fusion master model
+Clips,Clips,Derived from Springs,Clips,Spring clip hardware grouped from Fusion master model
+Seat Belts,Seat Belts,Count by Length,Seat Belts,Seat support belt bodies grouped from Fusion master model
+Back rest belts,Back Rest Belts,Count by Height,Back Rest Belts,Back support belt bodies grouped from Fusion master model
+Handle Frame,Handle Frame,Area/Volume,Handle Frame,Arm internal frame bodies grouped from Fusion master model

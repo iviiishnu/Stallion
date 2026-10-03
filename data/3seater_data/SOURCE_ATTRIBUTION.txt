@@ -1,0 +1,17 @@
+STALLION SOFA MASTER DATASET — SOURCE ATTRIBUTION
+
+The merged dataset was constructed from the following supplied Roboflow datasets.
+The source data.yaml files identify these datasets as CC BY 4.0.
+
+- sofa_v3: stallion_sofa1.v1-stallion_sofa_v3.yolov8(1).zip
+  https://universe.roboflow.com/arpitha-l8cet/stallion_sofa1/dataset/1
+  License stated by source: CC BY 4.0
+
+- sofa_v2_component: stallion_sofa2.v1i.yolov8(1).zip
+  https://universe.roboflow.com/arpitha-l8cet/stallion_sofa2/dataset/1
+  License stated by source: CC BY 4.0
+
+- sofa_v2_old: stallion_sofa.v2-stallion_sofa_v2.yolov8(1).zip
+  https://universe.roboflow.com/arpitha-l8cet/stallion_sofa/dataset/2
+  License stated by source: CC BY 4.0
+

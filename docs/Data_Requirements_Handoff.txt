@@ -1,0 +1,58 @@
+STALLION SOFA COSTING ENGINE - DATA & ASSET REQUIREMENTS
+========================================================
+This document outlines the specific data, specifications, and 3D assets required from the manufacturing/design team to transition the Stallion Sofa Costing Engine from a prototype to a production-ready system.
+
+Please provide the following data points and files:
+
+1. INDUSTRY PRICING DATABASE (Replaces placeholder cost_sheet.csv)
+------------------------------------------------------------------
+We need a comprehensive list of actual material and labor costs used in production. 
+Format needed: Excel or CSV
+Required Fields:
+- Component Name (e.g., Wood Frame, Plywood, Seat Foam, Fabric, Springs)
+- Unit of Measurement (e.g., cubic feet, square meters, kg, pieces)
+- Cost per Unit (in INR)
+- Standard Labor Rate (Total flat rate per sofa or hourly rate)
+- Standard Finishing Cost (Flat rate per sofa)
+- Target Margins (Overhead percentage and Profit percentage)
+
+2. VALIDATED MASTER BOM (Replaces placeholder master_template_spec.csv)
+-----------------------------------------------------------------------
+We need the exact, real-world Bill of Materials for your STANDARD 3-SEATER sofa model. This acts as the baseline that our engine will scale up or down.
+Format needed: Excel or CSV
+Required Fields:
+- Component Name
+- Baseline Quantity used for a standard 3-seater
+- Unit of Measurement
+
+3. ERGONOMIC & DIMENSION CONSTRAINTS
+------------------------------------
+To prevent users from generating quotes for structurally impossible or non-ergonomic sofas, we need hard manufacturing limits for a 3-seater sofa.
+Format needed: Text or Document
+Required Fields:
+- Minimum & Maximum viable Length (mm)
+- Minimum & Maximum viable Width / Depth (mm)
+- Minimum & Maximum viable Height (mm)
+- (Optional) Any specific ratios that must be maintained (e.g., seat height to overall height).
+
+4. PARAMETRIC FUSION 360 MODEL (.f3d)
+-------------------------------------
+The core of Phase 5 requires the actual CAD model of the master 3-seater sofa. 
+Format needed: .f3d (Fusion 360 Archive File)
+Strict Requirements for the CAD Modeler:
+- The model MUST be fully parametric. 
+- You MUST use Fusion 360 "User Parameters" for the overall Length, Width, and Height of the sofa, such that changing these parameters dynamically resizes the model without breaking.
+- The names of the internal bodies/components in the Fusion browser tree MUST exactly match the Component Names provided in the Master BOM (e.g., "Wood Frame", "Seat Foam", "Plywood").
+
+5. SOFA IMAGE DATASET (For Custom AI Classification)
+----------------------------------------------------
+To improve the AI's ability to recognize different sofa types automatically, we need a dataset of sofa images.
+Format needed: ZIP folder of images (JPG/PNG/WEBP)
+Requirements:
+- Roughly 100-300 images in total.
+- Must include images of 1-seaters, 2-seaters, 3-seaters, and L-shapes.
+- Images should ideally be sorted into sub-folders by type (e.g., /3_seater, /L_shape).
+- Images can be taken from various angles (front, slight angle, etc.).
+
+---
+Note for the Data Team: The accuracy of the pricing and BOM data directly determines the accuracy of the final automated quotations. Please ensure the naming conventions (e.g., calling it "Seat Foam" vs just "Foam") are consistent across the CAD file, the BOM, and the Cost Sheet.

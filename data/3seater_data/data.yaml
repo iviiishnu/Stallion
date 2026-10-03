@@ -1,0 +1,17 @@
+# Stallion Sofa Master YOLOv8 Segmentation Dataset
+# Merged and normalized from three supplied Roboflow datasets.
+# No test split was fabricated; only the supplied train/valid splits are used.
+
+path: .
+train: train/images
+val: valid/images
+
+nc: 7
+names:
+  0: back_cushion
+  1: base
+  2: left_arm
+  3: legs
+  4: right_arm
+  5: seat_cushion
+  6: stallion-sofa
